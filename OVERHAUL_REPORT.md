@@ -27,7 +27,27 @@ This overhaul transforms the project into **HighSpin**: an offline Android music
 ### 1.4 Equalizer Index Modulo Exception & Feature Absence
 - **Location:** `com.lowspin.app.media.EqualizerManager.kt` & `EqualizerSettings.kt`
 - **Root Cause:** The original equalizer manager was a stub with only preset indices. If a negative index was encountered, `presetIndex % count` produced a negative number passed to Android's `AudioEffect` framework, throwing runtime exceptions. Furthermore, there were no manual band-level controls, no BassBoost effect, and no 3D Virtualizer effect.
-- **Fix:** Implemented full manual 5-band gain adjustment (-1500 mB to +1500 mB), preset selection with bounded clamping, Android `BassBoost` audio effect integration (0 to 1000 strength), and `Virtualizer` audio effect integration (0 to 1000 strength).
+- **Fix:** Implemented full manual 5-band gain adjustment (-1500 mB to +1500 mB), preset selection with bounded clamping, Android `BassBoost` audio effect integration (0 to 1000 strength), and `Virtualizer` audio effect integration (0 to 1000 strength). In addition, offline band persistence ensures band adjustments made before audio starts are safely saved to settings and applied on playback start, and preset selection clears custom overrides so preset profiles take full effect.
+
+### 1.5 Local LRC Directory Path Resolution & Audio Filename Extraction
+- **Location:** `com.lowspin.app.data.lyrics.LrcLyricsSource.kt`
+- **Root Cause:** In candidate LRC discovery, `folderPath.trim().trim('/')` stripped the leading slash before testing `if (folder.startsWith("/"))`. On absolute storage paths (e.g. `/storage/emulated/0/Music`), this made the condition perpetually false, prepending the external storage root a second time (`/storage/emulated/0/storage/emulated/0/Music`) and completely failing to find local `.lrc` files in the song's actual directory. Furthermore, files named with track numbers (e.g. `01 - Song.lrc`) matching the audio filename were missed because only the ID3 title was checked.
+- **Fix:** Fixed path prefix handling to check absolute paths and normalized `storage/` roots, and added audio filename extraction from `song.matchKey` and case-insensitive `.LRC` matching.
+
+### 1.6 General LRC Metadata Tag Discrimination
+- **Location:** `com.lowspin.app.data.lyrics.LrcLyricsSource.kt`
+- **Root Cause:** The parser used a hardcoded check for 6 specific tags (`[ti:`, `[ar:`, etc.). Any file containing standard metadata tags such as `[length: ...]`, `[tool: ...]`, or `[encoder: ...]` treated those tags as plain-text lyrics, returning metadata headers in the lyrics display.
+- **Fix:** Replaced hardcoded tag checks with generalized regex `HEADER_PATTERN = Pattern.compile("^\\[[a-zA-Z_-]+:.*]$")`, correctly excluding all metadata headers from lyric rendering.
+
+### 1.7 Jetpack Compose Duplicate Key Stability & Accurate Queue Tracking
+- **Location:** `com.lowspin.app.ui.components.QueueSheet.kt`, `LibraryScreen.kt`, and `PlaybackController.kt`
+- **Root Cause:** `QueueSheet` keyed items solely by `song.id`. Queuing a track twice or repeating caused immediate `IllegalArgumentException: Key was already used` crashes. In addition, `QueueSheet` guessed the current track index using `indexOfFirst`, which picked the first duplicate rather than the currently playing instance. In `LibraryScreen`, `ArtistsTab` keyed by `artistId`, which crashed when multiple songs had unassigned `artistId == 0`.
+- **Fix:** Exposed `currentMediaItemIndex` directly on `PlayerUiState`. Keyed upcoming queue items by `${song.id}_$index`, artist items by `artist`, album items by `${albumId}_${album}`, and folder items by `${folderPath}_${folderName}`. Updated `SongDao.observeArtists()` to `GROUP BY artist` to consolidate split artist rows.
+
+### 1.8 Synchronized Lyrics Premature Highlight
+- **Location:** `com.lowspin.app.ui.screens.nowplaying.NowPlayingScreen.kt`
+- **Root Cause:** `LyricsCard` clamped `indexOfLast` with `.coerceAtLeast(0)`. During an instrumental intro before the first lyric's timestamp (e.g. 0-15s), line 0 was prematurely highlighted in accent color and scrolled to before any singing started.
+- **Fix:** Removed `.coerceAtLeast(0)`, keeping `activeIndex = -1` until the playback timestamp reaches the first lyric line.
 
 ---
 

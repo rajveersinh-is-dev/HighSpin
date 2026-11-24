@@ -39,4 +39,37 @@ class EqualizerPresetsTest {
         assertEquals(500, clampDsb(500))
         assertEquals(1000, clampDsb(1500))
     }
+
+    @Test
+    fun presetFallbackGains_returns5BandsForEveryPreset() {
+        for (i in EqualizerPresets.indices) {
+            val gains = EqualizerManager.presetFallbackGains(i)
+            assertEquals("Preset $i (${EqualizerPresets[i]}) must have 5 bands", 5, gains.size)
+        }
+    }
+
+    @Test
+    fun presetFallbackGains_flatIsAllZeros() {
+        val flatGains = EqualizerManager.presetFallbackGains(0)
+        assertEquals(listOf(0, 0, 0, 0, 0), flatGains)
+    }
+
+    @Test
+    fun presetFallbackGains_rockHasVShapedProfile() {
+        val rockIndex = EqualizerPresets.indexOf("Rock")
+        assertTrue(rockIndex >= 0)
+        val rockGains = EqualizerManager.presetFallbackGains(rockIndex)
+        // V-shaped: lows and highs boosted, mids dipped
+        assertTrue(rockGains[0] > 0) // Bass boosted
+        assertTrue(rockGains[4] > 0) // Treble boosted
+        assertTrue(rockGains[2] < rockGains[0]) // Mids lower than bass
+    }
+
+    @Test
+    fun presetFallbackGains_outOfBoundsFallsBackSafely() {
+        val negative = EqualizerManager.presetFallbackGains(-1)
+        val excessive = EqualizerManager.presetFallbackGains(999)
+        assertEquals(5, negative.size)
+        assertEquals(5, excessive.size)
+    }
 }

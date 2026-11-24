@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 data class PlayerUiState(
     val connected: Boolean = false,
     val currentSong: SongEntity? = null,
+    val currentMediaItemIndex: Int = 0,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0L,
@@ -170,6 +171,7 @@ class PlaybackController(
             old.copy(
                 connected = true,
                 currentSong = current,
+                currentMediaItemIndex = mediaController.currentMediaItemIndex,
                 isPlaying = mediaController.isPlaying,
                 isBuffering = mediaController.playbackState == Player.STATE_BUFFERING,
                 positionMs = mediaController.currentPosition.coerceAtLeast(0L),

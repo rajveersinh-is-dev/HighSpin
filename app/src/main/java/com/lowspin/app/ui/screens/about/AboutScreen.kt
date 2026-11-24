@@ -56,13 +56,13 @@ fun AboutScreen(onBack: () -> Unit) {
             VinylGlyph(Modifier.size(96.dp))
             Spacer(Modifier.height(24.dp))
             Text(
-                text = "lowspin",
+                text = "highspin",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Medium),
                 color = LowspinTextPrimary
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Lowspin \u00B7 version $version",
+                text = "HighSpin \u00B7 version $version",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -75,7 +75,7 @@ fun AboutScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Lowspin has no internet permission. Your music, playlists and listening " +
+                text = "HighSpin has no internet permission. Your music, playlists and listening " +
                     "history never leave your phone.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

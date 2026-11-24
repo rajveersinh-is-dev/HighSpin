@@ -11,6 +11,7 @@ import java.util.regex.Pattern
 object LrcParser {
     private val TIMESTAMP_PATTERN = Pattern.compile("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")
     private val OFFSET_PATTERN = Pattern.compile("\\[offset:\\s*([+-]?\\d+)\\s*]", Pattern.CASE_INSENSITIVE)
+    private val HEADER_PATTERN = Pattern.compile("^\\[[a-zA-Z_-]+:.*]$")
 
     fun parse(content: String): Lyrics? {
         if (content.isBlank()) return null
@@ -27,9 +28,7 @@ object LrcParser {
 
         for (rawLine in content.lineSequence()) {
             val line = rawLine.trim()
-            if (line.isEmpty() || line.startsWith("[ti:") || line.startsWith("[ar:") ||
-                line.startsWith("[al:") || line.startsWith("[by:") || line.startsWith("[offset:")
-            ) {
+            if (line.isEmpty() || HEADER_PATTERN.matcher(line).matches()) {
                 continue
             }
 
@@ -106,20 +105,40 @@ class LrcLyricsSource(
 
     private fun findCandidateLrcFiles(song: SongEntity): List<File> {
         val candidates = mutableListOf<File>()
-        val folder = song.folderPath.trim().trim('/')
+        val folder = song.folderPath.trim()
         val baseName = song.title.ifBlank { "unknown" }
         val extStorage = Environment.getExternalStorageDirectory()
 
+        // Extract base audio filename without extension from matchKey if available
+        val fileBaseName = song.matchKey.substringAfterLast('/', "")
+            .substringBeforeLast('.', "")
+            .trim()
+            .takeIf { it.isNotBlank() }
+
         // Direct folder resolution
         if (folder.isNotEmpty()) {
-            val fullFolder = if (folder.startsWith("/")) File(folder) else File(extStorage, folder)
+            val fullFolder = when {
+                folder.startsWith("/") -> File(folder)
+                folder.startsWith("storage/", ignoreCase = true) -> File("/$folder")
+                else -> File(extStorage, folder.trim('/'))
+            }
+
+            if (fileBaseName != null) {
+                candidates.add(File(fullFolder, "$fileBaseName.lrc"))
+                candidates.add(File(fullFolder, "$fileBaseName.LRC"))
+            }
+
             candidates.add(File(fullFolder, "$baseName.lrc"))
+            candidates.add(File(fullFolder, "$baseName.LRC"))
             candidates.add(File(fullFolder, "${song.artist} - ${song.title}.lrc"))
+            candidates.add(File(fullFolder, "${song.artist} - ${song.title}.LRC"))
 
             // Also check files in folder ending with .lrc with matching name
             fullFolder.listFiles()?.filter { it.extension.equals("lrc", ignoreCase = true) }?.forEach {
-                if (it.nameWithoutExtension.equals(baseName, ignoreCase = true) ||
-                    it.nameWithoutExtension.contains(baseName, ignoreCase = true)
+                val candidateName = it.nameWithoutExtension
+                if (candidateName.equals(baseName, ignoreCase = true) ||
+                    (fileBaseName != null && candidateName.equals(fileBaseName, ignoreCase = true)) ||
+                    candidateName.contains(baseName, ignoreCase = true)
                 ) {
                     candidates.add(it)
                 }
@@ -127,14 +146,18 @@ class LrcLyricsSource(
         }
 
         // Standard Music / Download directories
-        val standardDirs = listOf(
+        val standardDirs = listOfNotNull(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            File(extStorage, "Lyrics")
+            File(extStorage, "Lyrics"),
+            File(extStorage, "Music")
         )
 
         for (dir in standardDirs) {
             if (dir.exists()) {
+                if (fileBaseName != null) {
+                    candidates.add(File(dir, "$fileBaseName.lrc"))
+                }
                 candidates.add(File(dir, "$baseName.lrc"))
                 candidates.add(File(dir, "${song.artist} - ${song.title}.lrc"))
             }

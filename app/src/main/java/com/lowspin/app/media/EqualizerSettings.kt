@@ -47,6 +47,12 @@ class EqualizerSettings(context: Context) {
         val safe = if (EqualizerPresets.isEmpty()) 0 else value.coerceIn(0, EqualizerPresets.lastIndex)
         _preset.value = safe
         prefs.edit().putInt(KEY_PRESET, safe).apply()
+        clearCustomBandLevels()
+    }
+
+    fun clearCustomBandLevels() {
+        _customBandLevels.value = emptyMap()
+        prefs.edit().remove(KEY_BAND_LEVELS).apply()
     }
 
     fun setBassBoost(strength: Int) {

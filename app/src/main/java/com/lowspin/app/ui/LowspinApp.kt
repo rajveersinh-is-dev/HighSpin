@@ -563,7 +563,7 @@ fun LowspinApp(container: AppContainer) {
             onDismissRequest = { songToHide = null },
             title = {
                 Text(
-                    text = "Remove from Lowspin?",
+                    text = "Remove from HighSpin?",
                     style = MaterialTheme.typography.titleLarge,
                     color = LowspinTextPrimary
                 )

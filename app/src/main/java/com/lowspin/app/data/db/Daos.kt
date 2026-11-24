@@ -160,13 +160,13 @@ interface SongDao {
 
     @Query(
         """
-        SELECT artistId AS artistId,
+        SELECT COALESCE(MAX(artistId), 0) AS artistId,
                artist AS artist,
                COUNT(*) AS songCount,
                COUNT(DISTINCT albumId) AS albumCount,
                COALESCE(MIN(id), 0) AS artSongId
         FROM songs
-        GROUP BY artistId, artist
+        GROUP BY artist
         ORDER BY artist COLLATE NOCASE ASC
         """
     )

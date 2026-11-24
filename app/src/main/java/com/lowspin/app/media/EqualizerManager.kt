@@ -53,17 +53,19 @@ class EqualizerManager(
                     val safeIndex = presetIndex.coerceIn(0, numPresets - 1)
                     eq.usePreset(safeIndex.toShort())
                 }
-                // Apply custom band levels if any are stored
+                // Apply custom band levels if any are explicitly set
                 val custom = settings.customBandLevels.value
-                val range = eq.bandLevelRange
-                if (range != null && range.size >= 2) {
-                    val min = range[0].toInt()
-                    val max = range[1].toInt()
-                    val numBands = eq.numberOfBands.toInt()
-                    custom.forEach { (band, level) ->
-                        if (band in 0 until numBands) {
-                            val clamped = level.coerceIn(min, max).toShort()
-                            eq.setBandLevel(band.toShort(), clamped)
+                if (custom.isNotEmpty()) {
+                    val range = eq.bandLevelRange
+                    if (range != null && range.size >= 2) {
+                        val min = range[0].toInt()
+                        val max = range[1].toInt()
+                        val numBands = eq.numberOfBands.toInt()
+                        custom.forEach { (band, level) ->
+                            if (band in 0 until numBands) {
+                                val clamped = level.coerceIn(min, max).toShort()
+                                eq.setBandLevel(band.toShort(), clamped)
+                            }
                         }
                     }
                 }
@@ -72,17 +74,18 @@ class EqualizerManager(
     }
 
     fun setBandLevel(band: Int, levelMb: Int) {
-        val eq = equalizer ?: return
-        runCatching {
+        val eq = equalizer
+        val clamped = if (eq != null) {
             val range = eq.bandLevelRange
-            if (range != null && range.size >= 2) {
-                val min = range[0].toInt()
-                val max = range[1].toInt()
-                val clamped = levelMb.coerceIn(min, max).toShort()
-                eq.setBandLevel(band.toShort(), clamped)
-                settings.setBandLevel(band, clamped.toInt())
-            }
+            val min = range?.get(0)?.toInt() ?: -1500
+            val max = range?.get(1)?.toInt() ?: 1500
+            val c = levelMb.coerceIn(min, max).toShort()
+            runCatching { eq.setBandLevel(band.toShort(), c) }
+            c.toInt()
+        } else {
+            levelMb.coerceIn(-1500, 1500)
         }
+        settings.setBandLevel(band, clamped)
     }
 
     fun applyBassBoost(enabled: Boolean, strength: Int) {
@@ -106,7 +109,22 @@ class EqualizerManager(
     }
 
     fun getBands(): List<BandInfo> {
-        val eq = equalizer ?: return emptyList()
+        val eq = equalizer
+        if (eq == null) {
+            val custom = settings.customBandLevels.value
+            val presetGains = presetFallbackGains(settings.preset.value)
+            val defaultFreqs = listOf(60, 230, 910, 3600, 14000)
+            return defaultFreqs.mapIndexed { i, freq ->
+                val level = custom[i] ?: presetGains.getOrElse(i) { 0 }
+                BandInfo(
+                    index = i,
+                    centerFreqHz = freq,
+                    minLevelMb = -1500,
+                    maxLevelMb = 1500,
+                    currentLevelMb = level
+                )
+            }
+        }
         return runCatching {
             val numBands = eq.numberOfBands.toInt()
             val range = eq.bandLevelRange ?: shortArrayOf(-1500, 1500)
@@ -126,6 +144,22 @@ class EqualizerManager(
                 )
             }
         }.getOrDefault(emptyList())
+    }
+
+    companion object {
+        fun presetFallbackGains(presetIndex: Int): List<Int> = when (presetIndex) {
+            0 -> listOf(0, 0, 0, 0, 0) // Flat
+            1 -> listOf(600, 400, 100, 0, 0) // Bass Boost
+            2 -> listOf(-100, 200, 600, 300, -100) // Vocal Boost
+            3 -> listOf(400, 200, 100, 300, 300) // Acoustic
+            4 -> listOf(500, 300, -100, 200, 500) // Rock
+            5 -> listOf(-100, 200, 500, 200, -100) // Pop
+            6 -> listOf(400, 200, 100, 200, 400) // Jazz
+            7 -> listOf(400, 300, -100, 200, 300) // Classical
+            8 -> listOf(600, 400, 0, 200, 300) // Hip Hop
+            9 -> listOf(500, 400, 0, 200, 400) // Electronic
+            else -> listOf(0, 0, 0, 0, 0)
+        }
     }
 
     fun release() {

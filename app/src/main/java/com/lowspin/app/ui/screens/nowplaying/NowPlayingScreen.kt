@@ -403,7 +403,7 @@ private fun LyricsCard(
     isPlaying: Boolean
 ) {
     val activeIndex = if (lyrics.synced) {
-        lyrics.lines.indexOfLast { it.timeMs <= positionMs }.coerceAtLeast(0)
+        lyrics.lines.indexOfLast { it.timeMs <= positionMs }
     } else {
         -1
     }

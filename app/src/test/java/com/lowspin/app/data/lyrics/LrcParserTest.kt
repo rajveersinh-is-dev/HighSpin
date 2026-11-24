@@ -113,4 +113,68 @@ class LrcParserTest {
         assertEquals(65850L, lyrics.lines[1].timeMs)
         assertEquals(65854L, lyrics.lines[2].timeMs)
     }
+
+    @Test
+    fun parse_metadataHeaders_ignoredAndNotTreatedAsLyrics() {
+        val lrc = """
+            [ti:Song Title]
+            [ar:Artist Name]
+            [al:Album Name]
+            [by:LRC Maker]
+            [length: 03:45]
+            [tool: foobar2000]
+            [re: player]
+            [ve: 2.1]
+            [00:05.00]First real lyric line
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNotNull(lyrics)
+        assertTrue(lyrics!!.synced)
+        assertEquals(1, lyrics.lines.size)
+        assertEquals("First real lyric line", lyrics.lines[0].text)
+        assertEquals(5000L, lyrics.lines[0].timeMs)
+    }
+
+    @Test
+    fun parse_onlyMetadataHeaders_returnsNull() {
+        val lrc = """
+            [ti:Song Title]
+            [ar:Artist Name]
+            [length: 03:45]
+            [tool: foobar2000]
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNull(lyrics)
+    }
+
+    @Test
+    fun parse_unicodeAndMultilingualLyrics() {
+        val lrc = """
+            [00:05.00]¡Hola Mundo! Canción en español
+            [00:10.50]君の名は希望 🎵
+            [00:15.00]Café, naïve, façade
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNotNull(lyrics)
+        assertTrue(lyrics!!.synced)
+        assertEquals(3, lyrics.lines.size)
+        assertEquals("¡Hola Mundo! Canción en español", lyrics.lines[0].text)
+        assertEquals("君の名は希望 🎵", lyrics.lines[1].text)
+        assertEquals("Café, naïve, façade", lyrics.lines[2].text)
+    }
+
+    @Test
+    fun parse_extremeNegativeOffset_clampsTimestampsToZero() {
+        val lrc = """
+            [offset: -999999]
+            [00:10.00]Will be clamped to zero
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNotNull(lyrics)
+        assertEquals(0L, lyrics!!.lines[0].timeMs)
+    }
 }

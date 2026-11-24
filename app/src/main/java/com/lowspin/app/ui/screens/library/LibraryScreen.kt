@@ -464,7 +464,7 @@ private fun AlbumsTab(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(items = albums, key = { it.albumId }) { album ->
+            items(items = albums, key = { "${it.albumId}_${it.album}" }) { album ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -539,7 +539,7 @@ private fun ArtistsTab(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(items = artists, key = { it.artistId }) { artist ->
+            items(items = artists, key = { it.artist }) { artist ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -615,7 +615,7 @@ private fun FoldersTab(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(items = folders, key = { it.folderPath }) { folder ->
+            items(items = folders, key = { "${it.folderPath}_${it.folderName}" }) { folder ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

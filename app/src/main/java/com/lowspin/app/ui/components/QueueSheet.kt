@@ -64,17 +64,14 @@ fun QueueSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val queueSongs = remember(state.queueSize, state.currentSong) {
+    val queueSongs = remember(state.queueSize, state.currentSong, state.currentMediaItemIndex) {
         playbackController.getQueueSongs()
     }
     val currentSong = state.currentSong
-    val currentIndex = remember(queueSongs, currentSong) {
-        if (currentSong == null) -1
-        else queueSongs.indexOfFirst { it.id == currentSong.id }
-    }
+    val currentIndex = state.currentMediaItemIndex
 
     var localUpcoming by remember(queueSongs, currentIndex) {
-        val upcoming = if (currentIndex >= 0 && currentIndex < queueSongs.size - 1) {
+        val upcoming = if (currentIndex in 0 until queueSongs.size - 1) {
             queueSongs.subList(currentIndex + 1, queueSongs.size).toMutableList()
         } else {
             mutableListOf()
@@ -213,7 +210,7 @@ fun QueueSheet(
                 } else {
                     itemsIndexed(
                         items = localUpcoming,
-                        key = { _, song -> song.id }
+                        key = { index, song -> "${song.id}_$index" }
                     ) { index, song ->
                         val isDragging = draggingId == song.id
                         val realIndex = currentIndex + 1 + index
