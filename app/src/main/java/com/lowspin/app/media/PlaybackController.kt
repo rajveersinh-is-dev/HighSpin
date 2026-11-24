@@ -344,6 +344,8 @@ class PlaybackController(
         persistModes()
     }
 
+    fun setPlaybackSpeed(speed: Float) = setSpeed(speed)
+
     fun addToQueue(song: SongEntity) {
         val mediaController = controller ?: return
         songCache[song.id] = song
@@ -365,6 +367,34 @@ class PlaybackController(
         if (index in 0 until mediaController.mediaItemCount) {
             mediaController.removeMediaItem(index)
             persistQueueFromPlayer()
+        }
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val mediaController = controller ?: return
+        val count = mediaController.mediaItemCount
+        if (fromIndex in 0 until count && toIndex in 0 until count && fromIndex != toIndex) {
+            mediaController.moveMediaItem(fromIndex, toIndex)
+            persistQueueFromPlayer()
+        }
+    }
+
+    fun clearUpcomingQueue() {
+        val mediaController = controller ?: return
+        val currentIndex = mediaController.currentMediaItemIndex
+        val total = mediaController.mediaItemCount
+        if (currentIndex in 0 until total - 1) {
+            mediaController.removeMediaItems(currentIndex + 1, total)
+            persistQueueFromPlayer()
+        }
+    }
+
+    fun getQueueSongs(): List<SongEntity> {
+        val mediaController = controller ?: return emptyList()
+        val count = mediaController.mediaItemCount
+        return (0 until count).mapNotNull { index ->
+            val id = mediaController.getMediaItemAt(index).mediaId.toLongOrNull()
+            if (id != null) songCache[id] else null
         }
     }
 

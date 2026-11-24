@@ -33,7 +33,7 @@ class EmbeddedId3LyricsSource(
     }
 
     private fun parseFrames(tag: ByteArray, version: Int): Lyrics? {
-        var position = HEADER_SIZE
+        var position = 0
         while (position + FRAME_HEADER_SIZE <= tag.size) {
             val id = ascii(tag, position, 4)
             if (id[0] == '\u0000') break

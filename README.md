@@ -1,91 +1,121 @@
-# Lowspin
+# HighSpin 🎵
 
-A fully offline music player for Android. No account, no internet, no ads. Lowspin plays the local MP3 files already on your phone inside a clean, Spotify-inspired interface.
+**HighSpin** is a blazingly fast, modern, 100% offline local music player for Android, built with Jetpack Compose, ExoPlayer (Media3), Room Database, and Kotlin Coroutines.
 
-## Features
+No accounts, zero network permissions, zero tracking, and zero ads. HighSpin turns your device into an audiophile listening station with manual equalizer DSP, synchronized `.lrc` lyrics, discography exploration, and queue management.
 
-- **100% Offline:** Plays local MP3 files directly from device storage with zero network permissions required.
-- **Spotify-Inspired UI:** Clean navigation across Home, Library, Search, and a full-screen Now Playing view.
-- **Full Playback Controls:** Play/pause, next/previous, seek, shuffle, and repeat.
-- **Background Playback:** Persistent notification and lock-screen media controls.
-- **Library Organization:** Custom playlists and playback queue management.
-- **Metadata Support:** Automatically reads song title, artist, album, and cover art from ID3 tags.
+---
 
-## Images
-<img width="224" height="500" alt="image" src="https://github.com/user-attachments/assets/e70eb0ab-5774-4e48-b001-9c561b9c5b4a" /> <img width="224" height="500" alt="image" src="https://github.com/user-attachments/assets/1a3ae210-7e87-41b0-88f6-c0933b66bcdd" /> 
+## ✨ Features
 
+### 🎧 Precision Audio & Equalizer DSP
+- **Hardware-Accelerated Equalizer:** 5-band manual frequency sliders with real-time millibel adjustments.
+- **10 Audio Presets:** Flat, Bass Boost, Vocal Boost, Acoustic, Rock, Pop, Jazz, Classical, Hip Hop, and Electronic.
+- **BassBoost & 3D Virtualizer:** Dynamic spatial audio and low-end frequency enhancement with smooth slider controls.
+- **Playback Speed Controller:** Granular pitch-preserving speed picker ranging from `0.5x` up to `2.5x`.
+- **ExoPlayer Media3 Architecture:** Gapless playback, audio focus handling, and automatic ducking during calls/navigation.
 
-## Download & Install (Android APK)
+### 📝 Synced Lyrics & Tag Parsing
+- **External `.lrc` Auto-Detection:** Automatically discovers local `.lrc` files in track directories and device storage.
+- **Sub-Second Synced Scrolling:** Auto-scrolls and highlights the active lyric line synchronously as playback advances.
+- **Multi-Timestamp & Offset Support:** Supports combined timestamps (e.g., repeated chorus lines `[00:10.00][00:20.00]`) and `[offset: +/-ms]` tags.
+- **Embedded ID3 Tag Decoder:** Pure Kotlin binary parser for ID3v2.2, ID3v2.3, and ID3v2.4 `USLT` frames.
 
-Lowspin is distributed exclusively through GitHub Releases and is not on the Google Play Store.
+### 📚 Expanded 5-Tab Library Browsing
+- **Songs:** Complete catalog with instant filtering, sort order, and playing indicator.
+- **Playlists:** Custom playlist creation, song reordering, and smart playlist management.
+- **Albums (`AlbumDetailScreen`):** Parallax album hero, dominant-color gradient backdrop, release year, total duration, and track-numbered song list.
+- **Artists (`ArtistDetailScreen`):** Circular artist avatar hero, discography statistics, shuffle play, and aggregated track discography.
+- **Folders (`FolderDetailScreen`):** Hierarchical filesystem navigation, dedicated directory cards, and instant batch-play capabilities.
 
-1. Download the latest `lowspin.apk` from the [Releases](https://github.com/axnast/lowspin/releases) page.
-2. Open the APK file on your Android device and allow **Install from unknown sources** if prompted.
-3. Launch **Lowspin** and grant permission to access your local audio/music files.
-4. Your local MP3 library will load automatically.
+### 🎛️ Queue Management & Player UI
+- **Interactive Queue Sheet:** Reorder upcoming tracks, view live playback state, and swipe or tap to remove songs.
+- **Full-Screen Now Playing:** Rotating vinyl glyph animation, blurred dynamic palette gradients, seek bar, repeat modes, and quick sleep timer.
+- **Sleep Timer:** Sleep after minutes (`5`, `10`, `15`, `30`, `45`, `60`) or gracefully stop at the end of the current track.
+- **Mini Player:** Persistent, dismissable compact player bar with play/pause and like controls.
 
-## Build from Source
-Only needed if you want to compile the APK yourself on a PC—regular users can grab it from Releases.
-### Requirements
-- JDK 17+
-- Android SDK Command-Line Tools (with `ANDROID_HOME` set)
+### 🔒 100% Offline Guarantee & Privacy
+- **Zero Internet Permissions:** `android.permission.INTERNET` is **NOT** declared in `AndroidManifest.xml`.
+- **Zero Analytics / Telemetry:** No crash analytics, telemetry, or remote telemetry SDKs.
+- **Storage Management:** Live album art cache size calculation with one-tap cache clear and complete library rescan.
 
-### Steps
+---
 
-```bash
-git clone [https://github.com/axnast/lowspin.git](https://github.com/axnast/lowspin.git)
-cd lowspin
-```
-
-Build the APK using the Gradle wrapper:
-
-**Windows:**
-```cmd
-gradlew.bat assembleDebug
-```
-
-**macOS / Linux:**
-```bash
-./gradlew assembleDebug
-```
-
-The generated APK will be in `app/build/outputs/apk/debug/` (use `assembleRelease` for a release build).
-
-## Tech Stack
-
-- **Platform:** Native Android (Kotlin, Gradle Kotlin DSL)
-- **Audio:** Local storage scanning & ID3 tag parsing
-- **Development:** Co-developed with DeepSeek
-
-## Project Structure
+## 🏗️ Architecture & Tech Stack
 
 ```text
-lowspin/
-├── app/                   # Android application source & resources
-├── gradle/                # Gradle wrapper and version catalog
-├── build.gradle.kts       # Top-level Gradle build configuration
-├── settings.gradle.kts    # Project module settings
-├── gradle.properties      # Gradle environment settings
-├── PLAN.md                # Development notes and planning
-└── README.md              # Project documentation
+com.lowspin.app/
+├── data/
+│   ├── art/          # Offline album art pipeline (memory cache -> disk cache -> MediaStore)
+│   ├── db/           # Room Database, DAOs, Entities, and Queries
+│   ├── lyrics/       # Composite lyrics engine (external .lrc parser + embedded ID3 decoder)
+│   ├── repository/   # MusicRepository, PlaylistRepository
+│   └── scanner/      # MediaStore audio scanner & recorder exclusion filter
+├── di/               # Lightweight manual Dependency Injection container (AppContainer)
+├── media/            # ExoPlayer Media3 PlaybackService, EqualizerManager, SmartShuffle
+├── ui/
+│   ├── components/   # SongRow, AlbumArtImage, QueueSheet, SpeedPickerSheet, MiniPlayer
+│   ├── screens/      # Library, AlbumDetail, ArtistDetail, FolderDetail, Equalizer, Settings
+│   ├── settings/     # Appearance preferences & accessibility styling
+│   └── theme/        # Spotify-inspired Material3 dark theme & dynamic accent colors
+└── util/             # Millisecond formatting & time utilities
 ```
 
-## Roadmap
+- **UI Framework:** 100% Jetpack Compose with Material 3
+- **Audio Engine:** `androidx.media3:media3-exoplayer:1.4.1`, `media3-session`
+- **Database:** `androidx.room:room-ktx:2.6.1` with KSP compiler
+- **Image Palette:** `androidx.palette:palette-ktx:1.0.0`
+- **Language & Runtime:** Kotlin 2.0.21, Coroutines 1.9.0, Java 17
 
-- [ ] Equalizer
-- [ ] Sleep timer
-- [ ] Lyrics support (`.lrc` files)
-- [ ] Custom themes and accent colors
-- [ ] Folder-based browsing
+---
 
-## Disclaimer
+## 🧪 Verification & Testing
 
-Lowspin is an independent personal project and is not affiliated with, endorsed by, or connected to Spotify.
+HighSpin includes a suite of JUnit 4 and Kotlin unit tests verifying all algorithmic invariants:
 
-## License
+- **`LrcParserTest`:** Verifies standard LRC parsing, multi-timestamp line duplication, positive/negative offset shifts, millisecond fraction lengths, and un-synced plaintext fallbacks.
+- **`TrackFilterTest`:** Verifies exclusion of OEM call recordings, WhatsApp/Telegram audio notes, screencasts, and preserves legitimate music titles.
+- **`SmartShuffleTest`:** Verifies repeat prevention across playback loops, queue boundary safety, and repeat-one mode respect.
+- **`FormattersTest`:** Verifies duration strings (`mm:ss`, `hh:mm:ss`, total album runtime).
+- **`EqualizerPresetsTest`:** Verifies preset array integrity, preset index bounds clamping, and BassBoost/Virtualizer decibel clamping.
 
-MIT — see the [LICENSE](LICENSE) file for details.
+Run the test suite locally:
+```bash
+./gradlew testDebugUnitTest
+```
 
-## Author
+---
 
-Built by [axnast](https://github.com/axnast).
+## 🔨 Building from Source
+
+### Prerequisites
+- JDK 17 (e.g. OpenJDK 17)
+- Android SDK with `build-tools;34.0.0` and `platforms;android-34`
+- Set `ANDROID_HOME` and `JAVA_HOME` environment variables
+
+### Build Debug APK
+```bash
+# Windows
+gradlew.bat assembleDebug
+
+# Linux / macOS
+./gradlew assembleDebug
+```
+The compiled APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
+
+---
+
+## 🚀 CI/CD
+
+HighSpin includes a GitHub Actions workflow in `.github/workflows/android.yml` that automatically:
+1. Checks out code on Ubuntu runners
+2. Sets up Temurin JDK 17 with Gradle caching
+3. Runs all unit tests via `gradlew testDebugUnitTest`
+4. Builds the debug APK via `gradlew assembleDebug`
+5. Uploads the resulting APK artifact for every push and PR to `main`
+
+---
+
+## 📄 License
+
+HighSpin is licensed under the MIT License.

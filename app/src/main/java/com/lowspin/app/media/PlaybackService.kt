@@ -144,7 +144,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         persistJob?.cancel()
-        runCatching { runBlocking { saveProgress() } }
+        runCatching { runBlocking(Dispatchers.IO) { saveProgress() } }
         container.equalizerManager.release()
         mediaSession?.release()
         mediaSession = null
@@ -155,18 +155,31 @@ class PlaybackService : MediaSessionService() {
 
     private fun startEqualizerObserver() {
         scope.launch {
-            container.equalizerSettings.enabled.collect { enabled ->
-                container.equalizerManager.apply(
-                    enabled,
-                    container.equalizerSettings.preset.value
-                )
+            container.equalizerSettings.enabled.collect {
+                container.equalizerManager.applyAll()
             }
         }
         scope.launch {
             container.equalizerSettings.preset.collect { preset ->
-                container.equalizerManager.apply(
+                container.equalizerManager.applyEqualizer(
                     container.equalizerSettings.enabled.value,
                     preset
+                )
+            }
+        }
+        scope.launch {
+            container.equalizerSettings.bassBoost.collect { bass ->
+                container.equalizerManager.applyBassBoost(
+                    container.equalizerSettings.enabled.value,
+                    bass
+                )
+            }
+        }
+        scope.launch {
+            container.equalizerSettings.virtualizer.collect { virt ->
+                container.equalizerManager.applyVirtualizer(
+                    container.equalizerSettings.enabled.value,
+                    virt
                 )
             }
         }

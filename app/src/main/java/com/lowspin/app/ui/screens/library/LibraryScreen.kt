@@ -1,10 +1,9 @@
 package com.lowspin.app.ui.screens.library
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
-import com.lowspin.app.ui.theme.LowspinOnAccent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,19 +19,24 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOff
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideSource
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -50,12 +54,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lowspin.app.data.db.AlbumSummary
+import com.lowspin.app.data.db.ArtistSummary
+import com.lowspin.app.data.db.FolderSummary
 import com.lowspin.app.data.db.PlaylistSummary
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.data.scanner.ScanState
+import com.lowspin.app.ui.components.AlbumArtImage
 import com.lowspin.app.ui.components.LikedSongsCard
 import com.lowspin.app.ui.components.NewPlaylistCard
 import com.lowspin.app.ui.components.PlaylistCard
@@ -63,7 +71,9 @@ import com.lowspin.app.ui.components.SectionHeader
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.VinylGlyph
 import com.lowspin.app.ui.components.pressScaleClickable
+import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinSurfaceElevated
+import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -71,18 +81,25 @@ import com.lowspin.app.ui.theme.LowspinTextPrimary
 fun LibraryScreen(
     songs: List<SongEntity>,
     playlists: List<PlaylistSummary>,
+    albums: List<AlbumSummary>,
+    artists: List<ArtistSummary>,
+    folders: List<FolderSummary>,
     likedCount: Int,
     scanState: ScanState,
     currentSongId: Long?,
     onSongClick: (SongEntity) -> Unit,
     onSongOptions: (SongEntity) -> Unit,
     onPlaylistClick: (Long) -> Unit,
+    onAlbumClick: (Long) -> Unit,
+    onArtistClick: (String) -> Unit,
+    onFolderClick: (String) -> Unit,
     onLikedClick: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onRefresh: () -> Unit,
     onSearchClick: () -> Unit,
     onManageFolders: () -> Unit,
     onHiddenSongs: () -> Unit,
+    onEqualizerClick: () -> Unit,
     onAbout: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -105,6 +122,7 @@ fun LibraryScreen(
             onRefresh = onRefresh,
             onManageFolders = onManageFolders,
             onHiddenSongs = onHiddenSongs,
+            onEqualizerClick = onEqualizerClick,
             onAbout = onAbout,
             onSettings = onSettings
         )
@@ -118,8 +136,8 @@ fun LibraryScreen(
         LibraryTabs(selected = tab, onSelect = { tab = it })
 
         Box(Modifier.weight(1f)) {
-            if (tab == 0) {
-                SongsTab(
+            when (tab) {
+                0 -> SongsTab(
                     songs = songs,
                     scanState = scanState,
                     currentSongId = currentSongId,
@@ -127,13 +145,24 @@ fun LibraryScreen(
                     onSongOptions = onSongOptions,
                     onRefresh = onRefresh
                 )
-            } else {
-                PlaylistsTab(
+                1 -> PlaylistsTab(
                     playlists = playlists,
                     likedCount = likedCount,
                     onPlaylistClick = onPlaylistClick,
                     onLikedClick = onLikedClick,
                     onCreatePlaylist = onCreatePlaylist
+                )
+                2 -> AlbumsTab(
+                    albums = albums,
+                    onAlbumClick = onAlbumClick
+                )
+                3 -> ArtistsTab(
+                    artists = artists,
+                    onArtistClick = onArtistClick
+                )
+                4 -> FoldersTab(
+                    folders = folders,
+                    onFolderClick = onFolderClick
                 )
             }
         }
@@ -150,6 +179,7 @@ private fun LibraryHeader(
     onRefresh: () -> Unit,
     onManageFolders: () -> Unit,
     onHiddenSongs: () -> Unit,
+    onEqualizerClick: () -> Unit,
     onAbout: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -207,6 +237,20 @@ private fun LibraryHeader(
                     }
                 )
                 DropdownMenuItem(
+                    text = { Text("Equalizer", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onEqualizerClick()
+                    }
+                )
+                DropdownMenuItem(
                     text = { Text("Manage folders", color = LowspinTextPrimary) },
                     leadingIcon = {
                         Icon(
@@ -235,7 +279,7 @@ private fun LibraryHeader(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("About Lowspin", color = LowspinTextPrimary) },
+                    text = { Text("About HighSpin", color = LowspinTextPrimary) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Rounded.Info,
@@ -272,11 +316,15 @@ private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         TabPill(label = "Songs", selected = selected == 0, onClick = { onSelect(0) })
         TabPill(label = "Playlists", selected = selected == 1, onClick = { onSelect(1) })
+        TabPill(label = "Albums", selected = selected == 2, onClick = { onSelect(2) })
+        TabPill(label = "Artists", selected = selected == 3, onClick = { onSelect(3) })
+        TabPill(label = "Folders", selected = selected == 4, onClick = { onSelect(4) })
     }
 }
 
@@ -394,6 +442,222 @@ private fun PlaylistsTab(
                 onClick = onCreatePlaylist,
                 modifier = Modifier.animateItem()
             )
+        }
+    }
+}
+
+@Composable
+private fun AlbumsTab(
+    albums: List<AlbumSummary>,
+    onAlbumClick: (Long) -> Unit
+) {
+    if (albums.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = "No albums found in your library.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            items(items = albums, key = { it.albumId }) { album ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .pressScaleClickable(onClick = { onAlbumClick(album.albumId) })
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (album.artSongId > 0) {
+                        AlbumArtImage(
+                            songId = album.artSongId,
+                            seed = album.album,
+                            modifier = Modifier.size(56.dp),
+                            sizePx = 160,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(LowspinSurfaceElevated),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Album,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = album.album,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = LowspinTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "${album.artist} \u00B7 ${if (album.songCount == 1) "1 song" else "${album.songCount} songs"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistsTab(
+    artists: List<ArtistSummary>,
+    onArtistClick: (String) -> Unit
+) {
+    if (artists.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = "No artists found in your library.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            items(items = artists, key = { it.artistId }) { artist ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .pressScaleClickable(onClick = { onArtistClick(artist.artist) })
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (artist.artSongId > 0) {
+                        AlbumArtImage(
+                            songId = artist.artSongId,
+                            seed = artist.artist,
+                            modifier = Modifier.size(56.dp),
+                            sizePx = 160,
+                            shape = CircleShape
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(LowspinSurfaceElevated),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = artist.artist,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = LowspinTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = buildString {
+                                if (artist.albumCount > 0) append("${artist.albumCount} albums \u00B7 ")
+                                append(if (artist.songCount == 1) "1 song" else "${artist.songCount} songs")
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoldersTab(
+    folders: List<FolderSummary>,
+    onFolderClick: (String) -> Unit
+) {
+    if (folders.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = "No music folders found.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            items(items = folders, key = { it.folderPath }) { folder ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .pressScaleClickable(onClick = { onFolderClick(folder.folderPath) })
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(LowspinSurfaceElevated),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = folder.folderName,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = LowspinTextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "${if (folder.songCount == 1) "1 song" else "${folder.songCount} songs"} \u00B7 ${folder.folderPath}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -545,7 +809,7 @@ private fun EmptyLibrary(onRefresh: () -> Unit) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Copy audio files to your phone, then rescan. Lowspin only reads local files.",
+            text = "Copy audio files to your phone, then rescan. HighSpin only reads local files.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

@@ -47,7 +47,8 @@ fun SongRow(
     onMoreClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     dragHandleModifier: Modifier? = null,
-    showDuration: Boolean = true
+    showDuration: Boolean = true,
+    showTrackNumber: Boolean = false
 ) {
     val style = LocalListStyle.current
     val glowColor = remember(song.id, song.dominantColorArgb) {
@@ -67,6 +68,18 @@ fun SongRow(
             .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (showTrackNumber && song.trackNumber > 0) {
+            Box(
+                modifier = Modifier.width(28.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = song.trackNumber.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else LowspinTextMuted
+                )
+            }
+        }
         if (style.showArt) {
             Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                 Box(
@@ -95,7 +108,7 @@ fun SongRow(
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.titleSmall,
-                color = LowspinTextPrimary,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else LowspinTextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

@@ -3,7 +3,9 @@ package com.lowspin.app.di
 import android.content.Context
 import com.lowspin.app.data.art.AlbumArtRepository
 import com.lowspin.app.data.db.LowspinDatabase
+import com.lowspin.app.data.lyrics.CompositeLyricsSource
 import com.lowspin.app.data.lyrics.EmbeddedId3LyricsSource
+import com.lowspin.app.data.lyrics.LrcLyricsSource
 import com.lowspin.app.data.lyrics.LyricsRepository
 import com.lowspin.app.data.repository.MusicRepository
 import com.lowspin.app.data.repository.PlaylistRepository
@@ -43,7 +45,14 @@ class AppContainer(context: Context) {
 
     val playlistRepository = PlaylistRepository(database)
 
-    val lyricsRepository = LyricsRepository(EmbeddedId3LyricsSource(appContext))
+    val lyricsRepository = LyricsRepository(
+        CompositeLyricsSource(
+            listOf(
+                LrcLyricsSource(appContext),
+                EmbeddedId3LyricsSource(appContext)
+            )
+        )
+    )
 
     val equalizerSettings = EqualizerSettings(appContext)
     val equalizerManager = EqualizerManager(equalizerSettings, appContext)

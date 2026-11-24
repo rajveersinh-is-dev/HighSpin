@@ -45,6 +45,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 kotlin {
@@ -81,6 +87,10 @@ dependencies {
 
     implementation(libs.androidx.palette.ktx)
     implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

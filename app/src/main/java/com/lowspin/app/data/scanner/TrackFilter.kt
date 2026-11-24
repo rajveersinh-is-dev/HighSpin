@@ -134,6 +134,7 @@ object TrackFilter {
     fun normalizePath(path: String): String =
         path.replace('\\', '/')
             .trim()
+            .replace(Regex("/+"), "/")
             .trim('/')
             .lowercase(Locale.ROOT)
 }

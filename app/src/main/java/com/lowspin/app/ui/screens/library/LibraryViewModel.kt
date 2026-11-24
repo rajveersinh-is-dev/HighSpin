@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.lowspin.app.data.db.AlbumSummary
+import com.lowspin.app.data.db.ArtistSummary
+import com.lowspin.app.data.db.FolderSummary
 import com.lowspin.app.data.db.PlaylistSummary
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.data.repository.MusicRepository
@@ -31,6 +34,36 @@ class LibraryViewModel(
     )
 
     val playlists: StateFlow<List<PlaylistSummary>> = playlistRepository.playlists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val albums: StateFlow<List<AlbumSummary>> = musicRepository.albums.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val artists: StateFlow<List<ArtistSummary>> = musicRepository.artists.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val folders: StateFlow<List<FolderSummary>> = musicRepository.folders.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val recentlyPlayed: StateFlow<List<SongEntity>> = musicRepository.recentlyPlayed.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    val mostPlayed: StateFlow<List<SongEntity>> = musicRepository.mostPlayed.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()

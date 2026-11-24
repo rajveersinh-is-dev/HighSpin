@@ -64,8 +64,17 @@ import com.lowspin.app.data.lyrics.Lyrics
 import com.lowspin.app.di.AppContainer
 import com.lowspin.app.ui.components.CreatePlaylistDialog
 import com.lowspin.app.ui.components.MiniPlayer
+import com.lowspin.app.ui.components.QueueSheet
 import com.lowspin.app.ui.components.SongOptionsSheet
+import com.lowspin.app.ui.components.SpeedPickerSheet
 import com.lowspin.app.ui.screens.about.AboutScreen
+import com.lowspin.app.ui.screens.album.AlbumDetailScreen
+import com.lowspin.app.ui.screens.album.AlbumViewModel
+import com.lowspin.app.ui.screens.artist.ArtistDetailScreen
+import com.lowspin.app.ui.screens.artist.ArtistViewModel
+import com.lowspin.app.ui.screens.equalizer.EqualizerScreen
+import com.lowspin.app.ui.screens.folderdetail.FolderDetailScreen
+import com.lowspin.app.ui.screens.folderdetail.FolderDetailViewModel
 import com.lowspin.app.ui.screens.folders.FolderManagerScreen
 import com.lowspin.app.ui.screens.folders.FolderManagerViewModel
 import com.lowspin.app.ui.screens.hidden.HiddenSongsScreen
@@ -172,6 +181,9 @@ fun LowspinApp(container: AppContainer) {
 
     val songs by libraryViewModel.songs.collectAsStateWithLifecycle()
     val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle()
+    val albums by libraryViewModel.albums.collectAsStateWithLifecycle()
+    val artists by libraryViewModel.artists.collectAsStateWithLifecycle()
+    val folders by libraryViewModel.folders.collectAsStateWithLifecycle()
     val scanState by libraryViewModel.scanState.collectAsStateWithLifecycle()
     val playerState by libraryViewModel.playerState.collectAsStateWithLifecycle()
 
@@ -182,6 +194,8 @@ fun LowspinApp(container: AppContainer) {
     }
 
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
+    var showQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var showSpeedSheet by rememberSaveable { mutableStateOf(false) }
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<Lyrics?>(null) }
     var showSleepDialog by remember { mutableStateOf(false) }
@@ -252,6 +266,10 @@ fun LowspinApp(container: AppContainer) {
         }
     }
     val onOpenPlaylist = remember(navController) { { id: Long -> navController.navigate("playlist/$id") } }
+    val onOpenAlbum = remember(navController) { { id: Long -> navController.navigate("album/$id") } }
+    val onOpenArtist = remember(navController) { { name: String -> navController.navigate("artist/${Uri.encode(name)}") } }
+    val onOpenFolderDetail = remember(navController) { { path: String -> navController.navigate("folderDetail?path=${Uri.encode(path)}") } }
+    val onOpenEqualizer = remember(navController) { { navController.navigate("equalizer") } }
     val onOpenSearch = remember(navController) { { navController.navigate("search") } }
     val onOpenLiked = remember(navController) { { navController.navigate("liked") } }
     val onOpenFolders = remember(navController) { { navController.navigate("folders") } }
@@ -312,18 +330,25 @@ fun LowspinApp(container: AppContainer) {
                     LibraryScreen(
                         songs = songs,
                         playlists = playlists,
+                        albums = albums,
+                        artists = artists,
+                        folders = folders,
                         likedCount = remember(songs) { songs.count { it.isLiked } },
                         scanState = scanState,
                         currentSongId = currentSongId,
                         onSongClick = onPlaySong,
                         onSongOptions = onOpenOptions,
                         onPlaylistClick = onOpenPlaylist,
+                        onAlbumClick = onOpenAlbum,
+                        onArtistClick = onOpenArtist,
+                        onFolderClick = onOpenFolderDetail,
                         onLikedClick = onOpenLiked,
                         onCreatePlaylist = onRequestCreatePlaylist,
                         onRefresh = onRefresh,
                         onSearchClick = onOpenSearch,
                         onManageFolders = onOpenFolders,
                         onHiddenSongs = onOpenHidden,
+                        onEqualizerClick = onOpenEqualizer,
                         onAbout = onOpenAbout,
                         onSettings = onOpenSettings
                     )
@@ -386,6 +411,65 @@ fun LowspinApp(container: AppContainer) {
                 composable("settings") {
                     SettingsScreen(container = container, onBack = onBack)
                 }
+                composable(
+                    route = "album/{albumId}",
+                    arguments = listOf(navArgument("albumId") { type = NavType.LongType })
+                ) { entry ->
+                    val albumId = entry.arguments?.getLong("albumId") ?: return@composable
+                    val albumViewModel: AlbumViewModel = viewModel(
+                        key = "album-$albumId",
+                        factory = AlbumViewModel.factory(container, albumId)
+                    )
+                    AlbumDetailScreen(
+                        viewModel = albumViewModel,
+                        currentSongId = currentSongId,
+                        onBack = onBack,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable(
+                    route = "artist/{artistName}",
+                    arguments = listOf(navArgument("artistName") { type = NavType.StringType })
+                ) { entry ->
+                    val rawArtistName = entry.arguments?.getString("artistName") ?: return@composable
+                    val artistName = Uri.decode(rawArtistName)
+                    val artistViewModel: ArtistViewModel = viewModel(
+                        key = "artist-$artistName",
+                        factory = ArtistViewModel.factory(container, artistName)
+                    )
+                    ArtistDetailScreen(
+                        viewModel = artistViewModel,
+                        currentSongId = currentSongId,
+                        onBack = onBack,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable(
+                    route = "folderDetail?path={path}",
+                    arguments = listOf(navArgument("path") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    })
+                ) { entry ->
+                    val rawPath = entry.arguments?.getString("path") ?: ""
+                    val path = Uri.decode(rawPath)
+                    val folderDetailViewModel: FolderDetailViewModel = viewModel(
+                        key = "folder-$path",
+                        factory = FolderDetailViewModel.factory(container, path)
+                    )
+                    FolderDetailScreen(
+                        viewModel = folderDetailViewModel,
+                        currentSongId = currentSongId,
+                        onBack = onBack,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable("equalizer") {
+                    EqualizerScreen(
+                        container = container,
+                        onBack = onBack
+                    )
+                }
             }
         }
 
@@ -420,7 +504,13 @@ fun LowspinApp(container: AppContainer) {
                 lyrics = lyrics,
                 onToggleLyrics = { showLyrics = !showLyrics },
                 sleepLabel = sleepLabel,
-                onSleepClick = { showSleepDialog = true }
+                onSleepClick = { showSleepDialog = true },
+                onSpeedClick = { showSpeedSheet = true },
+                onEqualizerClick = {
+                    showNowPlaying = false
+                    navController.navigate("equalizer")
+                },
+                onQueueClick = { showQueueSheet = true }
             )
         }
     }
@@ -581,6 +671,24 @@ fun LowspinApp(container: AppContainer) {
                     Text("Close")
                 }
             }
+        )
+    }
+
+    if (showQueueSheet) {
+        QueueSheet(
+            state = playerState,
+            playbackController = container.playbackController,
+            onDismiss = { showQueueSheet = false }
+        )
+    }
+
+    if (showSpeedSheet) {
+        SpeedPickerSheet(
+            currentSpeed = playerState.playbackSpeed,
+            onSpeedSelected = { speed ->
+                container.playbackController.setPlaybackSpeed(speed)
+            },
+            onDismiss = { showSpeedSheet = false }
         )
     }
 }

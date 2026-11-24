@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -17,17 +18,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -38,8 +44,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,17 +56,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.di.AppContainer
-import com.lowspin.app.media.EqualizerPresets
 import com.lowspin.app.media.PlaybackService
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LowspinAccentShades
 import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinSurfaceHigh
+import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -66,10 +76,8 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val appearance = LocalAppearance.current
-    val equalizer = container.equalizerSettings
-    val eqEnabled by equalizer.enabled.collectAsStateWithLifecycle()
-    val eqPreset by equalizer.preset.collectAsStateWithLifecycle()
     var refresh by remember { mutableStateOf(0) }
 
     val accentIndex by appearance.accentIndex.collectAsStateWithLifecycle()
@@ -79,6 +87,9 @@ fun SettingsScreen(
     val reduceMotion by appearance.reduceMotion.collectAsStateWithLifecycle()
     val highContrast by appearance.highContrast.collectAsStateWithLifecycle()
     val largeTargets by appearance.largeTargets.collectAsStateWithLifecycle()
+
+    var cacheBytes by remember { mutableLongStateOf(container.albumArtRepository.diskCacheSizeBytes()) }
+    var isRescanning by remember { mutableStateOf(false) }
 
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -119,7 +130,12 @@ fun SettingsScreen(
             )
         }
 
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
             Text(
                 text = "Appearance",
                 style = MaterialTheme.typography.titleMedium,
@@ -176,47 +192,150 @@ fun SettingsScreen(
                 ToggleRow("Show album art", showArt, appearance::setShowArt)
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
-                text = "Sound",
+                text = "Library & Storage",
                 style = MaterialTheme.typography.titleMedium,
                 color = LowspinTextPrimary,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
+
             SettingCard {
-                ToggleRow("Equalizer", eqEnabled, equalizer::setEnabled)
-                if (eqEnabled) {
-                    Spacer(Modifier.height(4.dp))
-                    Row {
-                        EqualizerPresets.forEachIndexed { index, label ->
-                            val active = eqPreset == index
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (active) com.lowspin.app.ui.theme.LowspinOnAccent
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(
-                                        if (active) MaterialTheme.colorScheme.primary
-                                        else LowspinSurfaceHigh
-                                    )
-                                    .clickable { equalizer.setPreset(index) }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
+                val cacheFormatted = if (cacheBytes < 1024 * 1024) {
+                    "${cacheBytes / 1024} KB"
+                } else {
+                    String.format("%.1f MB", cacheBytes.toDouble() / (1024 * 1024))
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Album Art Cache",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LowspinTextPrimary
+                        )
+                        Text(
+                            text = "Disk usage: $cacheFormatted",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Text(
-                        text = "Preset support depends on your device's audio hardware.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    container.albumArtRepository.clearCaches()
+                                    cacheBytes = container.albumArtRepository.diskCacheSizeBytes()
+                                }
+                                Toast.makeText(context, "Album art cache cleared", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LowspinSurfaceHigh,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CleaningServices,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Clear")
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Rescan Media Library",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LowspinTextPrimary
+                        )
+                        Text(
+                            text = if (isRescanning) "Scanning files..." else "Scan device for new and updated tracks",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (!isRescanning) {
+                                isRescanning = true
+                                scope.launch {
+                                    container.musicRepository.refreshLibrary()
+                                    isRescanning = false
+                                    Toast.makeText(context, "Library scan started", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isRescanning,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LowspinSurfaceHigh,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (isRescanning) "Scanning" else "Rescan")
+                    }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Offline Guarantee & Privacy",
+                style = MaterialTheme.typography.titleMedium,
+                color = LowspinTextPrimary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            SettingCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "100% Offline by Design",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = LowspinTextPrimary
+                        )
+                        Text(
+                            text = "HighSpin has zero internet permissions declared in AndroidManifest.xml. Zero analytics, zero crash telemetry, zero cloud synchronization. All audio decoding, lyrics rendering, and equalizer DSP runs purely on-device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
             Text(
                 text = "Accessibility",
                 style = MaterialTheme.typography.titleMedium,
@@ -231,7 +350,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                text = "Notifications",
+                text = "Notifications & Background Play",
                 style = MaterialTheme.typography.titleMedium,
                 color = LowspinTextPrimary,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -282,13 +401,15 @@ fun SettingsScreen(
             }
 
             Text(
-                text = "On OxygenOS, One UI, MIUI and similar skins, also enable the " +
-                    "\u201CMedia playback\u201D notification category and allow background " +
-                    "activity for Lowspin. The media notification is then shown by the system.",
+                text = "On OxygenOS, One UI, MIUI and similar skins, enable the " +
+                    "\u201CMedia playback\u201D notification category and allow unrestricted background " +
+                    "activity for HighSpin.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp)
             )
+
+            Spacer(Modifier.height(32.dp))
         }
     }
 }
@@ -324,7 +445,7 @@ private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = com.lowspin.app.ui.theme.LowspinOnAccent,
+                checkedThumbColor = LowspinOnAccent,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 uncheckedTrackColor = LowspinSurfaceHigh
@@ -353,7 +474,7 @@ private fun ChoiceRow(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (active) com.lowspin.app.ui.theme.LowspinOnAccent
+                    color = if (active) LowspinOnAccent
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))

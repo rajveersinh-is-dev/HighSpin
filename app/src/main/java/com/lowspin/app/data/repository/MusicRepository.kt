@@ -168,6 +168,15 @@ class MusicRepository(
         return if (clean.isEmpty()) flowOf(emptyList()) else songDao.searchSongs(clean)
     }
 
+    fun getAlbumSongs(albumId: Long): Flow<List<SongEntity>> = songDao.observeAlbumSongs(albumId)
+
+    fun getArtistSongs(artist: String): Flow<List<SongEntity>> = songDao.observeArtistSongs(artist)
+
+    fun getFolderSongs(folderPath: String): Flow<List<SongEntity>> = songDao.observeFolderSongs(folderPath)
+
+    fun getRecentlyAdded(since: Long = System.currentTimeMillis() - 30L * 86_400_000L): Flow<List<SongEntity>> =
+        songDao.observeRecentlyAdded(since)
+
     suspend fun saveRecentSearch(query: String) {
         val clean = query.trim()
         if (clean.isEmpty()) return

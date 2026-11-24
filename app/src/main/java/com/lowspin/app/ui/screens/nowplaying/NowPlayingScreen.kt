@@ -26,9 +26,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
@@ -95,7 +98,10 @@ fun NowPlayingScreen(
     lyrics: Lyrics?,
     onToggleLyrics: () -> Unit,
     sleepLabel: String,
-    onSleepClick: () -> Unit
+    onSleepClick: () -> Unit,
+    onSpeedClick: () -> Unit = {},
+    onEqualizerClick: () -> Unit = {},
+    onQueueClick: () -> Unit = {}
 ) {
     val song = state.currentSong ?: return
 
@@ -330,7 +336,62 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
+
+            // Utility bar: Speed pill, Equalizer, Queue
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Playback speed pill
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(LowspinSurfaceHigh)
+                        .clickable(onClick = onSpeedClick)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Speed,
+                        contentDescription = "Playback Speed",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${state.playbackSpeed}x",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onEqualizerClick) {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = "Equalizer",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(onClick = onQueueClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
+                            contentDescription = "Playback Queue",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
