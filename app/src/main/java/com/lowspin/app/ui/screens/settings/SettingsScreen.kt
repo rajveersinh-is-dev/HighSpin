@@ -401,12 +401,12 @@ fun SettingsScreen(
 
             SettingCard {
                 ToggleRow(
-                    title = "Android 15 Live Notifications",
+                    title = "Android 15 Live Notifications & Bubbles",
                     checked = liveNotifications,
                     onChange = appearance::setLiveNotifications
                 )
                 Text(
-                    text = "Enables real-time progress, live track ticker, and status-bar capsule for Android 15 & 16.",
+                    text = "Enables real-time progress, live track ticker, notification bubbles, and status-bar capsule for OxygenOS 15 and Android 15 & 16.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
@@ -433,6 +433,23 @@ fun SettingsScreen(
             if (!notificationsEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 ActionButton("Grant notification permission") {
                     notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                ActionButton("Open bubble settings") {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    }.onFailure {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -467,8 +484,8 @@ fun SettingsScreen(
             }
 
             Text(
-                text = "On OxygenOS, One UI, MIUI and similar skins, enable the " +
-                    "\u201CMedia playback\u201D notification category and allow unrestricted background " +
+                text = "On OnePlus OxygenOS, ColorOS, One UI, and similar skins, enable the " +
+                    "\u201CHighSpin Playback\u201D notification category, allow Notification Bubbles, and allow unrestricted background " +
                     "activity for HighSpin.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -597,13 +614,20 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
 }
 
 private fun notificationChannelState(context: Context): String {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return "System managed"
     val channel = context.getSystemService(NotificationManager::class.java)
         ?.getNotificationChannel(PlaybackService.NOTIFICATION_CHANNEL_ID)
         ?: return "Not created yet — play a song once"
     return when {
         channel.importance == NotificationManager.IMPORTANCE_NONE -> "Disabled — enable it in notification settings"
-        channel.importance >= NotificationManager.IMPORTANCE_LOW -> "Enabled"
+        channel.importance >= NotificationManager.IMPORTANCE_HIGH -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && channel.canBubble()) {
+                "Enabled (High / Live Alerts & Bubbles)"
+            } else {
+                "Enabled (High / Live Alerts)"
+            }
+        }
+        channel.importance >= NotificationManager.IMPORTANCE_DEFAULT -> "Enabled (Default)"
+        channel.importance >= NotificationManager.IMPORTANCE_LOW -> "Enabled (Low)"
         else -> "Low importance — controls may be hidden"
     }
 }

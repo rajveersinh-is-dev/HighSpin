@@ -14,8 +14,12 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live",
+            "com.lowspin.app.playback.live.v3",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
+        )
+        assertEquals(
+            "com.lowspin.app.playback.live",
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
             "com.lowspin.app.media",
@@ -57,6 +61,26 @@ class LiveNotificationTest {
         assertEquals(
             "oplus.capsule.type",
             HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_TYPE
+        )
+        assertEquals(
+            "oplus_capsule_status",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_STATUS
+        )
+        assertEquals(
+            "capsule_title",
+            HighSpinLiveNotificationProvider.EXTRA_CAPSULE_TITLE
+        )
+        assertEquals(
+            "capsule_content",
+            HighSpinLiveNotificationProvider.EXTRA_CAPSULE_CONTENT
+        )
+        assertEquals(
+            "is_live_notification",
+            HighSpinLiveNotificationProvider.EXTRA_LIVE_NOTIFICATION
+        )
+        assertEquals(
+            "android.liveNotification",
+            HighSpinLiveNotificationProvider.EXTRA_ANDROID_LIVE_NOTIFICATION
         )
     }
 
@@ -229,5 +253,34 @@ class LiveNotificationTest {
         assertTrue(HighSpinThemes.any { it.id == "aurora" })
         assertTrue(HighSpinThemes.any { it.id == "synthwave" })
         assertTrue(HighSpinThemes.any { it.id == "frost" })
+    }
+
+    @Test
+    fun liveNotification_applyPromotedOngoingViaReflection_worksAndDoesNotThrow() {
+        class MockBuilder {
+            var promoted: Boolean = false
+            fun setRequestPromotedOngoing(value: Boolean): MockBuilder {
+                promoted = value
+                return this
+            }
+        }
+
+        class MockNotification {
+            @JvmField
+            var mRequestPromotedOngoing: Boolean = false
+        }
+
+        val builder = MockBuilder()
+        HighSpinLiveNotificationProvider.applyPromotedOngoingViaReflection(builder, true)
+        assertTrue(builder.promoted)
+        HighSpinLiveNotificationProvider.applyPromotedOngoingViaReflection(builder, false)
+        assertFalse(builder.promoted)
+
+        val notification = MockNotification()
+        HighSpinLiveNotificationProvider.applyPromotedOngoingViaReflection(notification, true)
+        assertTrue(notification.mRequestPromotedOngoing)
+
+        // Verifies no crash on arbitrary objects lacking the reflection target
+        HighSpinLiveNotificationProvider.applyPromotedOngoingViaReflection("ArbitraryString", true)
     }
 }

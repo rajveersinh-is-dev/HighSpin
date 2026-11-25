@@ -117,24 +117,37 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
 
-        // Clean up legacy channel that was stuck on IMPORTANCE_LOW
+        // Clean up legacy channels that were stuck on lower importance
         runCatching {
             manager.deleteNotificationChannel(HighSpinLiveNotificationProvider.LEGACY_NOTIFICATION_CHANNEL_ID)
+        }
+        runCatching {
+            manager.deleteNotificationChannel(HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_ID)
+        }
+
+        // If the current channel exists with importance lower than IMPORTANCE_HIGH, delete it so it can be recreated
+        val existing = manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID)
+        if (existing != null && existing.importance < NotificationManager.IMPORTANCE_HIGH) {
+            runCatching {
+                manager.deleteNotificationChannel(NOTIFICATION_CHANNEL_ID)
+            }
         }
 
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "HighSpin live playback controls and status-bar updates"
+            description = "HighSpin live playback controls, status-bar updates, and notification bubbles"
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-            setShowBadge(false)
+            setShowBadge(true)
             enableVibration(false)
             setSound(null, null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                setAllowBubbles(true)
+            }
         }
         manager.createNotificationChannel(channel)
     }
