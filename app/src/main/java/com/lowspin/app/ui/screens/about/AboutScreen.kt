@@ -54,7 +54,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 )
             }
             Text(
-                text = "About HighSpin",
+                text = "About",
                 style = MaterialTheme.typography.titleLarge,
                 color = LowspinTextPrimary
             )

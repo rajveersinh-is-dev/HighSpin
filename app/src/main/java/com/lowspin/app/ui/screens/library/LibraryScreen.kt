@@ -195,31 +195,29 @@ private fun LibraryHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             VinylGlyph(
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(24.dp),
                 rotating = scanning
             )
             Spacer(Modifier.width(10.dp))
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Library",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = LowspinTextPrimary
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
                     Text(
-                        text = "HighSpin",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = LowspinTextPrimary
+                        text = if (songCount == 0) "Offline" else "$songCount tracks",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (songCount == 0) "Offline" else "$songCount tracks",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
                 }
             }
         }

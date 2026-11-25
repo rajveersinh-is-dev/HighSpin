@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
+        runCatching { requestWindowFeature(Window.FEATURE_NO_TITLE) }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),

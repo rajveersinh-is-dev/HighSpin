@@ -1,7 +1,7 @@
 package com.lowspin.app.media
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,37 +14,84 @@ class LiveNotificationTest {
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
+        assertEquals(
+            "android.requestPromotedOngoing",
+            HighSpinLiveNotificationProvider.EXTRA_REQUEST_PROMOTED_ONGOING
+        )
+        assertEquals(
+            "android.shortCriticalText",
+            HighSpinLiveNotificationProvider.EXTRA_SHORT_CRITICAL_TEXT
+        )
+        assertEquals(
+            "android.substName",
+            HighSpinLiveNotificationProvider.EXTRA_SUBST_NAME
+        )
+        assertEquals(
+            "android.ongoing",
+            HighSpinLiveNotificationProvider.EXTRA_ONGOING
+        )
+        assertEquals(
+            "android.showChronometer",
+            HighSpinLiveNotificationProvider.EXTRA_SHOW_CHRONOMETER
+        )
     }
 
     @Test
     fun liveNotification_tickerFormattingValid() {
-        fun formatTicker(title: String?, artist: String?): String {
-            val safeTitle = title?.takeIf { it.isNotBlank() } ?: "HighSpin"
-            val safeArtist = artist?.takeIf { it.isNotBlank() } ?: "Local Audio"
-            return "$safeTitle • $safeArtist"
-        }
+        assertEquals(
+            "Song Title • Artist Name",
+            HighSpinLiveNotificationProvider.formatTicker("Song Title", "Artist Name")
+        )
+        assertEquals(
+            "Song Title • Local Audio",
+            HighSpinLiveNotificationProvider.formatTicker("Song Title", "")
+        )
+        assertEquals(
+            "HighSpin • Artist Name",
+            HighSpinLiveNotificationProvider.formatTicker("", "Artist Name")
+        )
+        assertEquals(
+            "HighSpin • Local Audio",
+            HighSpinLiveNotificationProvider.formatTicker(null, null)
+        )
+    }
 
-        assertEquals("Song Title • Artist Name", formatTicker("Song Title", "Artist Name"))
-        assertEquals("Song Title • Local Audio", formatTicker("Song Title", ""))
-        assertEquals("HighSpin • Artist Name", formatTicker("", "Artist Name"))
-        assertEquals("HighSpin • Local Audio", formatTicker(null, null))
+    @Test
+    fun liveNotification_shortCriticalFormattingValid() {
+        assertEquals(
+            "Bohemian Rhapsody",
+            HighSpinLiveNotificationProvider.formatShortCritical("Bohemian Rhapsody")
+        )
+        assertEquals(
+            "HighSpin",
+            HighSpinLiveNotificationProvider.formatShortCritical(null)
+        )
+        assertEquals(
+            "HighSpin",
+            HighSpinLiveNotificationProvider.formatShortCritical("   ")
+        )
+        val veryLongTitle = "This is an extremely long song title that exceeds twenty-four characters"
+        val formatted = HighSpinLiveNotificationProvider.formatShortCritical(veryLongTitle)
+        assertTrue(formatted.length <= 24)
+        assertEquals(veryLongTitle.take(24), formatted)
     }
 
     @Test
     fun liveNotification_progressCalculationValid() {
-        fun computeProgress(position: Long, duration: Long): Pair<Int, Int>? {
-            if (duration <= 0L || position < 0L) return null
-            val safePos = position.coerceIn(0L, duration)
-            return Pair(duration.toInt(), safePos.toInt())
-        }
-
-        val result = computeProgress(30_000L, 180_000L)
+        val result = HighSpinLiveNotificationProvider.computeProgress(30_000L, 180_000L)
         assertTrue(result != null)
         assertEquals(180_000, result!!.first)
         assertEquals(30_000, result.second)
 
         // Invalid duration gives null (no indeterminate progress)
-        assertEquals(null, computeProgress(0L, 0L))
-        assertEquals(null, computeProgress(100L, -1L))
+        assertNull(HighSpinLiveNotificationProvider.computeProgress(0L, 0L))
+        assertNull(HighSpinLiveNotificationProvider.computeProgress(100L, -1L))
+        assertNull(HighSpinLiveNotificationProvider.computeProgress(-10L, 100L))
+
+        // Clamped position if position exceeds duration
+        val clamped = HighSpinLiveNotificationProvider.computeProgress(200_000L, 180_000L)
+        assertTrue(clamped != null)
+        assertEquals(180_000, clamped!!.first)
+        assertEquals(180_000, clamped.second)
     }
 }

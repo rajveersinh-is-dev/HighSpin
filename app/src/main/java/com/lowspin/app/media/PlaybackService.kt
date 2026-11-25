@@ -21,6 +21,7 @@ import com.lowspin.app.MainActivity
 import com.lowspin.app.LowspinApplication
 import com.lowspin.app.R
 import com.lowspin.app.data.db.PlaybackStateEntity
+import com.lowspin.app.ui.settings.AppearanceSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,6 +113,7 @@ class PlaybackService : MediaSessionService() {
         startEqualizerObserver()
         startSleepTimer()
         startPersistLoop()
+        startLiveNotificationObserver()
     }
 
     private fun createNotificationChannel() {
@@ -214,6 +216,19 @@ class PlaybackService : MediaSessionService() {
             while (isActive) {
                 delay(5_000)
                 if (::player.isInitialized && player.isPlaying) persistProgress()
+            }
+        }
+    }
+
+    private fun startLiveNotificationObserver() {
+        val appearance = AppearanceSettings(this)
+        scope.launch {
+            appearance.liveNotifications.collect {
+                if (::player.isInitialized && player.mediaItemCount > 0) {
+                    runCatching {
+                        setMediaNotificationProvider(HighSpinLiveNotificationProvider(this@PlaybackService))
+                    }
+                }
             }
         }
     }
