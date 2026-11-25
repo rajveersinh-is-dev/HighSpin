@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,11 +39,24 @@ fun AboutScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                tint = LowspinTextPrimary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    tint = LowspinTextPrimary
+                )
+            }
+            Text(
+                text = "About HighSpin",
+                style = MaterialTheme.typography.titleLarge,
+                color = LowspinTextPrimary
             )
         }
 
@@ -56,8 +70,8 @@ fun AboutScreen(onBack: () -> Unit) {
             VinylGlyph(Modifier.size(96.dp))
             Spacer(Modifier.height(24.dp))
             Text(
-                text = "highspin",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Medium),
+                text = "HighSpin",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = LowspinTextPrimary
             )
             Spacer(Modifier.height(4.dp))

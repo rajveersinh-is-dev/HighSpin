@@ -144,6 +144,9 @@ class AppearanceSettings(context: Context) {
     private val _largeTargets = MutableStateFlow(prefs.getBoolean(KEY_TARGETS, false))
     val largeTargets: StateFlow<Boolean> = _largeTargets.asStateFlow()
 
+    private val _liveNotifications = MutableStateFlow(prefs.getBoolean(KEY_LIVE_NOTIFICATIONS, true))
+    val liveNotifications: StateFlow<Boolean> = _liveNotifications.asStateFlow()
+
     fun setTheme(index: Int) {
         val safe = index.coerceIn(0, HighSpinThemes.lastIndex)
         store { putInt(KEY_THEME, safe) }
@@ -189,6 +192,9 @@ class AppearanceSettings(context: Context) {
     fun setLargeTargets(value: Boolean) = store { putBoolean(KEY_TARGETS, value) }
         .also { _largeTargets.value = value }
 
+    fun setLiveNotifications(value: Boolean) = store { putBoolean(KEY_LIVE_NOTIFICATIONS, value) }
+        .also { _liveNotifications.value = value }
+
     private fun store(edit: android.content.SharedPreferences.Editor.() -> Unit) {
         prefs.edit().apply(edit).apply()
     }
@@ -207,5 +213,6 @@ class AppearanceSettings(context: Context) {
         const val KEY_MOTION = "reduce_motion"
         const val KEY_CONTRAST = "high_contrast"
         const val KEY_TARGETS = "large_targets"
+        const val KEY_LIVE_NOTIFICATIONS = "live_notifications"
     }
 }

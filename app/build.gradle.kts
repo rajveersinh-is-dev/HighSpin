@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "com.lowspin.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.lowspin.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 3
-        versionName = "2.1.1"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "2.2.0"
 
         vectorDrawables {
             useSupportLibrary = true

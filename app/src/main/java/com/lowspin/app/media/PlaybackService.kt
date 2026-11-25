@@ -93,11 +93,7 @@ class PlaybackService : MediaSessionService() {
         })
 
         createNotificationChannel()
-        val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
-            .setChannelId(NOTIFICATION_CHANNEL_ID)
-            .setChannelName(R.string.notification_channel_name)
-            .build()
-        notificationProvider.setSmallIcon(R.drawable.ic_stat_vinyl)
+        val notificationProvider = HighSpinLiveNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
 
         val sessionActivity = PendingIntent.getActivity(
@@ -125,8 +121,9 @@ class PlaybackService : MediaSessionService() {
             getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = getString(R.string.notification_channel_name)
+            description = "HighSpin live playback controls and status-bar updates"
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
             enableVibration(false)
             setSound(null, null)
         }

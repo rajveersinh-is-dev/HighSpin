@@ -93,6 +93,7 @@ fun SettingsScreen(
     val reduceMotion by appearance.reduceMotion.collectAsStateWithLifecycle()
     val highContrast by appearance.highContrast.collectAsStateWithLifecycle()
     val largeTargets by appearance.largeTargets.collectAsStateWithLifecycle()
+    val liveNotifications by appearance.liveNotifications.collectAsStateWithLifecycle()
 
     var cacheBytes by remember { mutableLongStateOf(container.albumArtRepository.diskCacheSizeBytes()) }
     var isRescanning by remember { mutableStateOf(false) }
@@ -393,6 +394,22 @@ fun SettingsScreen(
                 color = LowspinTextPrimary,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
+
+            SettingCard {
+                ToggleRow(
+                    title = "Android 15 Live Notifications",
+                    checked = liveNotifications,
+                    onChange = appearance::setLiveNotifications
+                )
+                Text(
+                    text = "Enables real-time progress, live track ticker, and status-bar capsule for Android 15 & 16.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
 
             DiagnosticCard(
                 title = "Notifications enabled",

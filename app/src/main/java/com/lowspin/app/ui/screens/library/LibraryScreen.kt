@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -186,26 +187,54 @@ private fun LibraryHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "Your Library",
-                style = MaterialTheme.typography.headlineMedium,
-                color = LowspinTextPrimary
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            VinylGlyph(
+                modifier = Modifier.size(26.dp),
+                rotating = scanning
             )
-            Text(
-                text = if (songCount == 0) "Local music" else "$songCount songs",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "HighSpin",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = LowspinTextPrimary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (songCount == 0) "Offline" else "$songCount tracks",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
         }
         IconButton(onClick = onSearchClick) {
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = "Search",
                 tint = LowspinTextPrimary
+            )
+        }
+        IconButton(onClick = onEqualizerClick) {
+            Icon(
+                imageVector = Icons.Rounded.GraphicEq,
+                contentDescription = "Equalizer",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
         Box {
@@ -317,7 +346,7 @@ private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         TabPill(label = "Songs", selected = selected == 0, onClick = { onSelect(0) })
@@ -331,7 +360,7 @@ private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun TabPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val background by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated,
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated.copy(alpha = 0.70f),
         animationSpec = tween(180),
         label = "tabBackground"
     )
@@ -345,11 +374,11 @@ private fun TabPill(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(50))
             .background(background)
             .pressScaleClickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 7.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
             color = content
         )
     }

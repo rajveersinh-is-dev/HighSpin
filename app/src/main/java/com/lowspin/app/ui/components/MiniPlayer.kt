@@ -2,6 +2,7 @@ package com.lowspin.app.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lowspin.app.data.art.GradientPlaceholder
@@ -72,9 +74,14 @@ fun MiniPlayer(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(tint)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(14.dp)
+            )
             .pointerInput(song.id) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
@@ -89,23 +96,23 @@ fun MiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(58.dp)
                 .pressScaleClickable(onClick = onExpand)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AlbumArtImage(
                 songId = song.id,
                 seed = song.album.ifBlank { song.title },
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(42.dp),
                 sizePx = 128,
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(8.dp)
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = song.title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = LowspinTextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -137,13 +144,13 @@ fun MiniPlayer(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(2.dp)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.30f))
+                .height(2.5.dp)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(progress)
-                    .height(2.dp)
+                    .height(2.5.dp)
                     .background(MaterialTheme.colorScheme.primary)
             )
         }
