@@ -8,7 +8,6 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
-import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -207,7 +206,7 @@ class HighSpinLiveNotificationProvider(
             notification.largeIcon = artBitmap
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 notification.extras.putParcelable(
-                    Notification.EXTRA_LARGE_ICON,
+                    Notification.EXTRA_LARGE_ICON_BIG,
                     Icon.createWithBitmap(artBitmap)
                 )
             }
@@ -215,7 +214,8 @@ class HighSpinLiveNotificationProvider(
 
         // 6. Complete Android 15 Promoted Ongoing (Live Updates) & OnePlus OxygenOS 15 Live Alerts extras
         val lyricJson = metadata.extras?.getString("lyricInfo")
-            ?: songId?.let { id -> buildLyricInfoJson(title, artist, album, id) }
+            ?: currentMediaItem?.mediaMetadata?.extras?.getString("lyricInfo")
+            ?: buildLyricInfoJson(title, artist, album, songId ?: 0L)
 
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
@@ -226,11 +226,9 @@ class HighSpinLiveNotificationProvider(
             putString("artist", artist)
             putString("album", album)
 
-            if (lyricJson != null) {
-                putString("lyricInfo", lyricJson)
-            }
+            putString("lyricInfo", lyricJson)
 
-            putBoolean(NotificationCompat.EXTRA_SHOW_WHEN, shouldBeOngoing)
+            putBoolean(Notification.EXTRA_SHOW_WHEN, shouldBeOngoing)
             putBoolean(EXTRA_SHOW_CHRONOMETER, shouldBeOngoing)
 
             if (isLiveEnabled) {
@@ -247,6 +245,7 @@ class HighSpinLiveNotificationProvider(
                 putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, shouldBeOngoing)
             } else {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false)
+                putBoolean(EXTRA_OPLUS_ONGOING, false)
                 putBoolean(EXTRA_OPLUS_CAPSULE, false)
                 putBoolean(EXTRA_OPLUS_COM_CAPSULE, false)
                 putBoolean(EXTRA_LIVE_NOTIFICATION, false)
@@ -256,9 +255,9 @@ class HighSpinLiveNotificationProvider(
             // Real-time track progress
             val progress = computeProgress(position, duration)
             if (progress != null) {
-                putInt(NotificationCompat.EXTRA_PROGRESS_MAX, progress.first)
-                putInt(NotificationCompat.EXTRA_PROGRESS, progress.second)
-                putBoolean(NotificationCompat.EXTRA_PROGRESS_INDETERMINATE, false)
+                putInt(Notification.EXTRA_PROGRESS_MAX, progress.first)
+                putInt(Notification.EXTRA_PROGRESS, progress.second)
+                putBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
             }
         }
 

@@ -25,16 +25,30 @@ private fun mimeTypeFor(song: SongEntity): String? {
 }
 
 /**
- * Escapes characters for safe JSON serialization.
+ * Escapes characters for safe JSON serialization compliant with RFC 8259.
+ * Handles quotation mark, reverse solidus, and all control characters (U+0000..U+001F).
  */
-fun escapeJson(s: String): String =
-    s.replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
-        .replace("\b", "\\b")
-        .replace("\u000c", "\\f")
+fun escapeJson(s: String): String {
+    val sb = StringBuilder(s.length + 16)
+    for (i in 0 until s.length) {
+        val ch = s[i]
+        when (ch) {
+            '\\' -> sb.append("\\\\")
+            '"' -> sb.append("\\\"")
+            '\n' -> sb.append("\\n")
+            '\r' -> sb.append("\\r")
+            '\t' -> sb.append("\\t")
+            '\b' -> sb.append("\\b")
+            '\u000c' -> sb.append("\\f")
+            in '\u0000'..'\u001f' -> {
+                val hex = ch.code.toString(16).padStart(4, '0')
+                sb.append("\\u").append(hex)
+            }
+            else -> sb.append(ch)
+        }
+    }
+    return sb.toString()
+}
 
 /**
  * Builds standard lyricInfo JSON recognized natively by OnePlus / ColorOS lock screen Live Space
@@ -47,10 +61,13 @@ fun buildLyricInfoJson(
     songId: Long,
     lrcContent: String? = null
 ): String {
+    val safeTitle = title.ifBlank { "HighSpin" }
+    val safeArtist = artist.ifBlank { "Local Audio" }
+    val safeAlbum = album.ifBlank { "HighSpin" }
     return if (!lrcContent.isNullOrBlank()) {
-        """{"songName":"${escapeJson(title)}","artist":"${escapeJson(artist)}","album":"${escapeJson(album)}","songId":"$songId","lyric":"${escapeJson(lrcContent)}","noLyric":false}"""
+        """{"songName":"${escapeJson(safeTitle)}","artist":"${escapeJson(safeArtist)}","album":"${escapeJson(safeAlbum)}","songId":"$songId","lyric":"${escapeJson(lrcContent)}","noLyric":false}"""
     } else {
-        """{"songName":"${escapeJson(title)}","artist":"${escapeJson(artist)}","album":"${escapeJson(album)}","songId":"$songId","noLyric":true}"""
+        """{"songName":"${escapeJson(safeTitle)}","artist":"${escapeJson(safeArtist)}","album":"${escapeJson(safeAlbum)}","songId":"$songId","noLyric":true}"""
     }
 }
 

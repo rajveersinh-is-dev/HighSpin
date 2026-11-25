@@ -393,7 +393,7 @@ private fun extractAudioSpecs(context: Context, song: SongEntity): AudioTechnica
         val rawBitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
         bitrateKbps = rawBitrate?.toIntOrNull()?.let { it / 1000 }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val rawSampleRate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
             sampleRateHz = rawSampleRate?.toIntOrNull()
         }

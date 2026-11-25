@@ -168,6 +168,20 @@ class LiveNotificationTest {
         assertEquals("""Hello \"World\"""", escapeJson("""Hello "World""""))
         assertEquals("""Back\\Slash""", escapeJson("""Back\Slash"""))
         assertEquals("Line1\\nLine2\\rTab\\t", escapeJson("Line1\nLine2\rTab\t"))
+        assertEquals("Bell\\bFormFeed\\f", escapeJson("Bell\bFormFeed\u000c"))
+        assertEquals("Null\\u0000Esc\\u001bEnd", escapeJson("Null\u0000Esc\u001bEnd"))
+
+        // Blank string fallbacks for OnePlus capsule stability
+        val blankJson = buildLyricInfoJson(
+            title = "   ",
+            artist = "",
+            album = "  \t ",
+            songId = 123L
+        )
+        assertTrue(blankJson.contains(""""songName":"HighSpin""""))
+        assertTrue(blankJson.contains(""""artist":"Local Audio""""))
+        assertTrue(blankJson.contains(""""album":"HighSpin""""))
+        assertTrue(blankJson.contains(""""songId":"123""""))
     }
 
     @Test
