@@ -152,8 +152,16 @@ class PlaybackService : MediaSessionService() {
         manager.createNotificationChannel(channel)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val convChannelId = HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
+            val existingConv = manager.getNotificationChannel(convChannelId)
+            if (existingConv != null && (existingConv.importance < NotificationManager.IMPORTANCE_HIGH || !existingConv.canBubble())) {
+                runCatching {
+                    manager.deleteNotificationChannel(convChannelId)
+                }
+            }
+
             val conversationChannel = NotificationChannel(
-                "${NOTIFICATION_CHANNEL_ID}_${HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID}",
+                convChannelId,
                 "Now Playing",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {

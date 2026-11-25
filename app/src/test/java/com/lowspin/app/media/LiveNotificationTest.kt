@@ -14,12 +14,19 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v6",
+            "com.lowspin.app.playback.live.v7",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
             "com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
+        )
+        assertEquals(
+            "com.lowspin.app.playback.live.v7_com.lowspin.app.playback_bubble",
+            HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v6")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v5")
@@ -408,5 +415,17 @@ class LiveNotificationTest {
 
         val nonExistent = HighSpinLiveNotificationProvider.findDeclaredField(Child::class.java, "mDoesNotExist")
         assertNull(nonExistent)
+    }
+
+    @Test
+    fun liveNotification_conversationChannelMatchesShortcut() {
+        val expected = "${HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID}_${HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID}"
+        assertEquals(expected, HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID)
+    }
+
+    @Test
+    fun bubbleActivity_classIsAvailableForBubbleIntent() {
+        val clazz = com.lowspin.app.BubbleActivity::class.java
+        assertTrue(android.app.Activity::class.java.isAssignableFrom(clazz))
     }
 }

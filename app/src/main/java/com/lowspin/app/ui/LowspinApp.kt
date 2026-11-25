@@ -179,6 +179,15 @@ fun LowspinApp(container: AppContainer) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentPlaylistId = backStackEntry?.arguments?.getLong("playlistId")?.takeIf { it > 0L }
 
+    LaunchedEffect(backStackEntry) {
+        if (backStackEntry == null) {
+            navController.navigate("library") {
+                popUpTo(0)
+                launchSingleTop = true
+            }
+        }
+    }
+
     val songs by libraryViewModel.songs.collectAsStateWithLifecycle()
     val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle()
     val albums by libraryViewModel.albums.collectAsStateWithLifecycle()
@@ -262,7 +271,9 @@ fun LowspinApp(container: AppContainer) {
     val onOpenOptions = remember { { song: SongEntity -> optionsSong = song } }
     val onBack = remember(navController) {
         {
-            navController.popBackStack()
+            if (navController.previousBackStackEntry != null) {
+                navController.popBackStack()
+            }
             Unit
         }
     }

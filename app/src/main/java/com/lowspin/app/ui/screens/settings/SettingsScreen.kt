@@ -511,7 +511,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(vertical = 12.dp)
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(96.dp))
         }
     }
 }
@@ -549,8 +549,10 @@ private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
             colors = SwitchDefaults.colors(
                 checkedThumbColor = LowspinOnAccent,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
+                checkedBorderColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                uncheckedTrackColor = MaterialTheme.colorScheme.surface,
+                uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
         )
     }
@@ -570,11 +572,17 @@ private fun ChoiceRow(
             color = LowspinTextPrimary
         )
         Spacer(Modifier.height(8.dp))
-        Row {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
             options.forEach { (label, value) ->
                 val active = selected == value
                 Text(
                     text = label,
+                    maxLines = 1,
+                    softWrap = false,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (active) LowspinOnAccent
                     else MaterialTheme.colorScheme.onSurfaceVariant,

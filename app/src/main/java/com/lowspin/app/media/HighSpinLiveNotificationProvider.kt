@@ -21,6 +21,7 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import com.google.common.collect.ImmutableList
+import com.lowspin.app.BubbleActivity
 import com.lowspin.app.MainActivity
 import com.lowspin.app.R
 import com.lowspin.app.ui.settings.AppearanceSettings
@@ -57,9 +58,11 @@ class HighSpinLiveNotificationProvider(
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v6"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v7"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
+        val CONVERSATION_CHANNEL_ID = "${NOTIFICATION_CHANNEL_ID}_$PLAYBACK_SHORTCUT_ID"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v6",
             "com.lowspin.app.playback.live.v5",
             "com.lowspin.app.playback.live.v4",
             "com.lowspin.app.playback.live.v3",
@@ -170,7 +173,7 @@ class HighSpinLiveNotificationProvider(
         }
 
         /**
-         * Creates Android 11+ Notification Bubble metadata targeting MainActivity.
+         * Creates Android 11+ Notification Bubble metadata targeting BubbleActivity.
          * Ensures the dynamic shortcut is registered and sets FLAG_MUTABLE on Android 12+ (API 31+)
          * so SystemUI can configure task launch flags. Uses shortcutId constructor on Android 11+
          * (API 30+) as required by BubbleController.
@@ -178,9 +181,9 @@ class HighSpinLiveNotificationProvider(
         fun createBubbleMetadata(context: Context): NotificationCompat.BubbleMetadata? {
             publishPlaybackShortcut(context)
             return runCatching {
-                val bubbleIntent = Intent(context, MainActivity::class.java).apply {
+                val bubbleIntent = Intent(context, BubbleActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
                 }
                 val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -374,12 +377,26 @@ class HighSpinLiveNotificationProvider(
         // relying on fragile platform recoverBuilder (which throws ClassNotFoundException on
         // AndroidX MediaStyle templates). This sets ongoing, clears groupKey, assigns shortcut ID
         // for bubbles, binds BubbleMetadata, and applies promoted ongoing flags cleanly.
+        val targetChannelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && isLiveEnabled && bubbleMetadata != null) {
+            CONVERSATION_CHANNEL_ID
+        } else {
+            NOTIFICATION_CHANNEL_ID
+        }
+
         val notification = runCatching {
+            val person = Person.Builder()
+                .setName("HighSpin")
+                .setKey("highspin_playback")
+                .setBot(false)
+                .setImportant(true)
+                .build()
+
             val compatBuilder = NotificationCompat.Builder(context, rawNotification)
-                .setChannelId(NOTIFICATION_CHANNEL_ID)
+                .setChannelId(targetChannelId)
                 .setOngoing(shouldBeOngoing)
                 .setGroup(null)
                 .setShortcutId(PLAYBACK_SHORTCUT_ID)
+                .addPerson(person)
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -445,7 +462,7 @@ class HighSpinLiveNotificationProvider(
         // Guaranteed override of internal fields to satisfy promotable and bubble constraints
         applyNotificationInternalOverrides(
             target = notification,
-            channelId = NOTIFICATION_CHANNEL_ID,
+            channelId = targetChannelId,
             shortcutId = PLAYBACK_SHORTCUT_ID,
             bubbleMetadata = platformBubble,
             clearGroup = true
