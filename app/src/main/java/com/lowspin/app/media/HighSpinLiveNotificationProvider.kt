@@ -140,16 +140,37 @@ class HighSpinLiveNotificationProvider(
         }
 
         /**
+         * Builds the intent used by the dynamic shortcut. Targets [BubbleActivity] with multi-task
+         * flags so SystemUI bubble controllers on Android 11+ and Android 15 can embed it safely
+         * into floating TaskViews.
+         */
+        fun buildPlaybackShortcutIntent(context: Context): Intent {
+            return Intent(context, BubbleActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            }
+        }
+
+        /**
+         * Builds the pending intent target for [BubbleMetadata].
+         */
+        fun buildBubbleIntent(context: Context): Intent {
+            return Intent(context, BubbleActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            }
+        }
+
+        /**
          * Publishes a long-lived dynamic shortcut to ShortcutManagerCompat.
          * On Android 11+ (API 30+), notifications MUST be associated with a valid
          * registered dynamic shortcut in order to be eligible for Notification Bubbles.
+         * The shortcut intent targets [BubbleActivity] with multi-task flags so SystemUI's
+         * BubbleExtractor/canLaunchInTaskView verifies allowEmbedded and documentLaunchMode successfully.
          */
         fun publishPlaybackShortcut(context: Context) {
             runCatching {
-                val shortcutIntent = Intent(context, MainActivity::class.java).apply {
-                    action = Intent.ACTION_VIEW
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
+                val shortcutIntent = buildPlaybackShortcutIntent(context)
 
                 val person = Person.Builder()
                     .setName("HighSpin")
@@ -181,10 +202,7 @@ class HighSpinLiveNotificationProvider(
         fun createBubbleMetadata(context: Context): NotificationCompat.BubbleMetadata? {
             publishPlaybackShortcut(context)
             return runCatching {
-                val bubbleIntent = Intent(context, BubbleActivity::class.java).apply {
-                    action = Intent.ACTION_VIEW
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                }
+                val bubbleIntent = buildBubbleIntent(context)
                 val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                 } else {
@@ -378,7 +396,12 @@ class HighSpinLiveNotificationProvider(
         // AndroidX MediaStyle templates). This sets ongoing, clears groupKey, assigns shortcut ID
         // for bubbles, binds BubbleMetadata, and applies promoted ongoing flags cleanly.
         val targetChannelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && isLiveEnabled && bubbleMetadata != null) {
-            CONVERSATION_CHANNEL_ID
+            val nm = context.getSystemService(android.app.NotificationManager::class.java)
+            if (nm?.getNotificationChannel(CONVERSATION_CHANNEL_ID) != null) {
+                CONVERSATION_CHANNEL_ID
+            } else {
+                NOTIFICATION_CHANNEL_ID
+            }
         } else {
             NOTIFICATION_CHANNEL_ID
         }

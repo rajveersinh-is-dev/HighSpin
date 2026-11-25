@@ -428,4 +428,22 @@ class LiveNotificationTest {
         val clazz = com.lowspin.app.BubbleActivity::class.java
         assertTrue(android.app.Activity::class.java.isAssignableFrom(clazz))
     }
+
+    @Test
+    fun liveNotification_shortcutIntentCreatedSuccessfully() {
+        val context = object : android.content.ContextWrapper(null) {
+            override fun getPackageName(): String = "com.lowspin.app"
+        }
+        val intent = HighSpinLiveNotificationProvider.buildPlaybackShortcutIntent(context)
+        org.junit.Assert.assertNotNull(intent)
+    }
+
+    @Test
+    fun liveNotification_bubbleIntentCreatedSuccessfully() {
+        val context = object : android.content.ContextWrapper(null) {
+            override fun getPackageName(): String = "com.lowspin.app"
+        }
+        val intent = HighSpinLiveNotificationProvider.buildBubbleIntent(context)
+        org.junit.Assert.assertNotNull(intent)
+    }
 }

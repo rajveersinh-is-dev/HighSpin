@@ -40,6 +40,7 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|fontScale|uiMode"
             android:exported="true"
             android:launchMode="singleTop"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.Lowspin.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -49,6 +50,7 @@
 
         <activity
             android:name=".BubbleActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|fontScale|uiMode"
             android:exported="true"
             android:allowEmbedded="true"
             android:resizeableActivity="true"

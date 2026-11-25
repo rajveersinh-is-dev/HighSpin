@@ -641,8 +641,11 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
 }
 
 private fun notificationChannelState(context: Context): String {
-    val channel = context.getSystemService(NotificationManager::class.java)
-        ?.getNotificationChannel(PlaybackService.NOTIFICATION_CHANNEL_ID)
+    val nm = context.getSystemService(NotificationManager::class.java)
+    val convChannel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        nm?.getNotificationChannel(com.lowspin.app.media.HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID)
+    } else null
+    val channel = convChannel ?: nm?.getNotificationChannel(PlaybackService.NOTIFICATION_CHANNEL_ID)
         ?: return "Not created yet — play a song once"
     return when {
         channel.importance == NotificationManager.IMPORTANCE_NONE -> "Disabled — enable it in notification settings"

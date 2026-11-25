@@ -180,9 +180,9 @@ fun LowspinApp(container: AppContainer) {
     val currentPlaylistId = backStackEntry?.arguments?.getLong("playlistId")?.takeIf { it > 0L }
 
     LaunchedEffect(backStackEntry) {
-        if (backStackEntry == null) {
+        if (backStackEntry == null || navController.currentDestination == null) {
             navController.navigate("library") {
-                popUpTo(0)
+                popUpTo(0) { inclusive = true }
                 launchSingleTop = true
             }
         }
@@ -269,10 +269,13 @@ fun LowspinApp(container: AppContainer) {
         }
     }
     val onOpenOptions = remember { { song: SongEntity -> optionsSong = song } }
-    val onBack = remember(navController) {
+    val onBack = remember(navController, activity) {
         {
-            if (navController.previousBackStackEntry != null) {
+            val currentRoute = navController.currentBackStackEntry?.destination?.route
+            if (currentRoute != null && currentRoute != "library" && navController.previousBackStackEntry != null) {
                 navController.popBackStack()
+            } else if (currentRoute == "library") {
+                activity?.moveTaskToBack(true)
             }
             Unit
         }
@@ -306,6 +309,14 @@ fun LowspinApp(container: AppContainer) {
     BackHandler(enabled = !showNowPlaying && songToHide != null) { songToHide = null }
     BackHandler(enabled = !showNowPlaying && songToHide == null && optionsSong != null) {
         optionsSong = null
+    }
+    BackHandler(
+        enabled = !showNowPlaying &&
+            songToHide == null &&
+            optionsSong == null &&
+            backStackEntry?.destination?.route == "library"
+    ) {
+        activity?.moveTaskToBack(true)
     }
 
     CompositionLocalProvider(LocalListStyle provides listStyle) {

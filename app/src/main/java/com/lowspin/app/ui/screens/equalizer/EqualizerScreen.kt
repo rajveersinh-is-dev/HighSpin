@@ -103,8 +103,10 @@ fun EqualizerScreen(
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = LowspinOnAccent,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    checkedBorderColor = MaterialTheme.colorScheme.primary,
                     uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 ),
                 modifier = Modifier.padding(end = 12.dp)
             )

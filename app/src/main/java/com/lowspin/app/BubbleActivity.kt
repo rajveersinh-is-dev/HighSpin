@@ -53,9 +53,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.data.db.SongEntity
@@ -90,24 +92,36 @@ class BubbleActivity : ComponentActivity() {
         val appearance = AppearanceSettings(applicationContext)
 
         setContent {
+            val textScale by appearance.textScale.collectAsStateWithLifecycle()
+            val density = LocalDensity.current
+
             CompositionLocalProvider(
                 LocalAppearance provides appearance,
                 LocalAlbumArtRepository provides container.albumArtRepository
             ) {
                 LowspinTheme {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        BubblePlayerScreen(
-                            container = container,
-                            onOpenMainApp = {
-                                val intent = Intent(this, MainActivity::class.java).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                }
-                                startActivity(intent)
-                            }
+                    CompositionLocalProvider(
+                        LocalDensity provides Density(
+                            density = density.density,
+                            fontScale = density.fontScale * textScale
                         )
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            BubblePlayerScreen(
+                                container = container,
+                                onOpenMainApp = {
+                                    val intent = Intent(this@BubbleActivity, MainActivity::class.java).apply {
+                                        action = Intent.ACTION_MAIN
+                                        addCategory(Intent.CATEGORY_LAUNCHER)
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                                    }
+                                    startActivity(intent)
+                                }
+                            )
+                        }
                     }
                 }
             }
