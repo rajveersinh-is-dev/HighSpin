@@ -216,7 +216,8 @@ fun SettingsScreen(
                             "Equalizer Bars" to 0f,
                             "Neon Wave" to 1f,
                             "Pulse Dots" to 2f,
-                            "Liquid Aura" to 3f
+                            "Liquid Aura" to 3f,
+                            "Orbital Pulsar" to 4f
                         ),
                         selected = visualizerStyle.toFloat(),
                         onSelect = { appearance.setVisualizerStyle(it.toInt()) }
@@ -453,6 +454,13 @@ fun SettingsScreen(
                                 Uri.parse("package:${context.packageName}")
                             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
+                    }.onFailure {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

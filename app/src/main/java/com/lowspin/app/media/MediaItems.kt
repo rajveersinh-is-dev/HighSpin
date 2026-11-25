@@ -26,9 +26,9 @@ private fun mimeTypeFor(song: SongEntity): String? {
 
 /**
  * Builds standard lyricInfo JSON recognized natively by OnePlus / ColorOS lock screen Live Space
- * and dynamic island capsules.
+ * and dynamic island capsules. Supports both synchronized LRC text and no-lyric fallback states.
  */
-fun buildLyricInfoJson(song: SongEntity): String {
+fun buildLyricInfoJson(song: SongEntity, lrcContent: String? = null): String {
     fun escapeJson(s: String): String =
         s.replace("\\", "\\\\")
             .replace("\"", "\\\"")
@@ -36,7 +36,11 @@ fun buildLyricInfoJson(song: SongEntity): String {
             .replace("\r", "\\r")
             .replace("\t", "\\t")
 
-    return """{"songName":"${escapeJson(song.title)}","artist":"${escapeJson(song.artist)}","album":"${escapeJson(song.album)}","songId":"${song.id}","noLyric":true}"""
+    return if (!lrcContent.isNullOrBlank()) {
+        """{"songName":"${escapeJson(song.title)}","artist":"${escapeJson(song.artist)}","album":"${escapeJson(song.album)}","songId":"${song.id}","lyric":"${escapeJson(lrcContent)}","noLyric":false}"""
+    } else {
+        """{"songName":"${escapeJson(song.title)}","artist":"${escapeJson(song.artist)}","album":"${escapeJson(song.album)}","songId":"${song.id}","noLyric":true}"""
+    }
 }
 
 fun SongEntity.toMediaItem(): MediaItem {

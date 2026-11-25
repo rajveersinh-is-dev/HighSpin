@@ -1,6 +1,10 @@
 package com.lowspin.app.media
 
+import android.app.Notification
+import androidx.media3.common.Player
+import com.lowspin.app.ui.settings.HighSpinThemes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -142,5 +146,56 @@ class LiveNotificationTest {
         assertTrue(jsonString.contains(""""album":"Starboy""""))
         assertTrue(jsonString.contains(""""songId":"42""""))
         assertTrue(jsonString.contains(""""noLyric":true"""))
+
+        val withLyrics = buildLyricInfoJson(song, "[00:12.34]I'm trying to put you in the worst mood")
+        assertTrue(withLyrics.contains(""""noLyric":false"""))
+        assertTrue(withLyrics.contains(""""lyric":"[00:12.34]I'm trying to put you in the worst mood""""))
+    }
+
+    @Test
+    fun liveNotification_isPlaybackActive_stateValidation() {
+        // Active when user intended to play AND player is ready or buffering
+        assertTrue(HighSpinLiveNotificationProvider.isPlaybackActive(true, Player.STATE_READY))
+        assertTrue(HighSpinLiveNotificationProvider.isPlaybackActive(true, Player.STATE_BUFFERING))
+
+        // When playlist or track reaches end, playWhenReady may remain true, but playbackState is ENDED.
+        // MUST return false so notification is clearable and OxygenOS 15 Live Alerts dismiss properly:
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(true, Player.STATE_ENDED))
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(true, Player.STATE_IDLE))
+
+        // When paused by user
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(false, Player.STATE_READY))
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(false, Player.STATE_BUFFERING))
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(false, Player.STATE_ENDED))
+        assertFalse(HighSpinLiveNotificationProvider.isPlaybackActive(false, Player.STATE_IDLE))
+    }
+
+    @Test
+    fun liveNotification_computeOngoingFlags_correctMasking() {
+        val ongoingMask = Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
+        val baseFlags = 0x10 // FLAG_AUTO_CANCEL
+
+        // When ongoing should be true
+        val enabled = HighSpinLiveNotificationProvider.computeOngoingFlags(baseFlags, true)
+        assertEquals(baseFlags or ongoingMask, enabled)
+        assertTrue((enabled and Notification.FLAG_ONGOING_EVENT) != 0)
+        assertTrue((enabled and Notification.FLAG_NO_CLEAR) != 0)
+
+        // When ongoing should be false, flags are completely stripped
+        val disabled = HighSpinLiveNotificationProvider.computeOngoingFlags(enabled, false)
+        assertEquals(baseFlags, disabled)
+        assertEquals(0, disabled and Notification.FLAG_ONGOING_EVENT)
+        assertEquals(0, disabled and Notification.FLAG_NO_CLEAR)
+    }
+
+    @Test
+    fun liveNotification_themesCountAndVisualizerAesthetics() {
+        // 12 curated aesthetic themes
+        assertEquals(12, HighSpinThemes.size)
+        assertTrue(HighSpinThemes.any { it.id == "tokyo" })
+        assertTrue(HighSpinThemes.any { it.id == "velvet" })
+        assertTrue(HighSpinThemes.any { it.id == "aurora" })
+        assertTrue(HighSpinThemes.any { it.id == "synthwave" })
+        assertTrue(HighSpinThemes.any { it.id == "frost" })
     }
 }

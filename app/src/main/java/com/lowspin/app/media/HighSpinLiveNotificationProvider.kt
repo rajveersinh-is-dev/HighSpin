@@ -63,6 +63,29 @@ class HighSpinLiveNotificationProvider(
         const val EXTRA_LIVE_NOTIFICATION = "is_live_notification"
         const val EXTRA_ANDROID_LIVE_NOTIFICATION = "android.liveNotification"
 
+        /**
+         * Determines if playback is genuinely active (ready or buffering), preventing
+         * ended/idle tracks from staying pinned as ongoing notifications or freezing
+         * OxygenOS 15 punch-hole capsules.
+         */
+        fun isPlaybackActive(playWhenReady: Boolean, playbackState: Int): Boolean {
+            return playWhenReady && (
+                playbackState == androidx.media3.common.Player.STATE_READY ||
+                playbackState == androidx.media3.common.Player.STATE_BUFFERING
+            )
+        }
+
+        /**
+         * Computes notification ongoing flags cleanly without bitwise leaks.
+         */
+        fun computeOngoingFlags(currentFlags: Int, isOngoing: Boolean): Int {
+            return if (isOngoing) {
+                currentFlags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
+            } else {
+                currentFlags and Notification.FLAG_ONGOING_EVENT.inv() and Notification.FLAG_NO_CLEAR.inv()
+            }
+        }
+
         fun formatTicker(title: String?, artist: String?): String {
             val safeTitle = title?.takeIf { it.isNotBlank() } ?: "HighSpin"
             val safeArtist = artist?.takeIf { it.isNotBlank() } ?: "Local Audio"
@@ -130,8 +153,10 @@ class HighSpinLiveNotificationProvider(
         mediaNotification: MediaNotification
     ): MediaNotification {
         val player = mediaSession.player
-        val isPlaying = player.playWhenReady
+        val isPlaybackActive = isPlaybackActive(player.playWhenReady, player.playbackState)
         val isLiveEnabled = appearance.liveNotifications.value
+        val shouldBeOngoing = isPlaybackActive && isLiveEnabled
+
         val metadata = player.mediaMetadata
         val title = metadata.title?.toString()?.takeIf { it.isNotBlank() } ?: "HighSpin"
         val artist = metadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: "Local Audio"
@@ -143,66 +168,83 @@ class HighSpinLiveNotificationProvider(
         val notification = mediaNotification.notification
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
-        // DefaultMediaNotificationProvider hardcodes setOngoing(false) right before build(), so we restore it:
-        if (isPlaying) {
-            notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
-        } else {
-            notification.flags = (notification.flags and Notification.FLAG_ONGOING_EVENT.inv() and Notification.FLAG_NO_CLEAR.inv())
-        }
+        // DefaultMediaNotificationProvider hardcodes setOngoing(false) right before build(), so we restore it
+        // strictly when playback is active and live notifications are enabled.
+        notification.flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
 
         // 2. High priority transport category & public lockscreen visibility
         notification.category = NotificationCompat.CATEGORY_TRANSPORT
         notification.visibility = NotificationCompat.VISIBILITY_PUBLIC
+        @Suppress("DEPRECATION")
         notification.priority = NotificationCompat.PRIORITY_DEFAULT
 
         // 3. Status-bar live ticker text
-        if (isLiveEnabled && isPlaying) {
+        if (shouldBeOngoing) {
             notification.tickerText = formatTicker(title, artist)
         } else {
             notification.tickerText = null
         }
 
         // 4. Live Chronometer Ticking for status bar pill & lockscreen cards
-        if (isLiveEnabled && isPlaying && position >= 0L) {
+        // Media3 calls setShowWhen(false), which suppresses chronometers. Restoring android.showWhen
+        // ensures Android 15 and OxygenOS 15 Live Alerts render live progress.
+        if (shouldBeOngoing && position >= 0L) {
             notification.`when` = System.currentTimeMillis() - position
+        } else {
+            notification.`when` = System.currentTimeMillis()
         }
 
         // 5. Safe Album Art Bitmap for large icon if present
         val currentMediaItem = player.currentMediaItem
         val songId = currentMediaItem?.mediaId?.toLongOrNull()
-        if (songId != null) {
-            loadCachedArtBitmapSafe(songId)?.let { bitmap ->
-                notification.largeIcon = bitmap
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    notification.extras.putParcelable(
-                        Notification.EXTRA_LARGE_ICON,
-                        Icon.createWithBitmap(bitmap)
-                    )
-                }
+        var artBitmap = songId?.let { loadCachedArtBitmapSafe(it) }
+        @Suppress("DEPRECATION")
+        if (artBitmap == null && notification.largeIcon != null) {
+            artBitmap = notification.largeIcon
+        }
+        if (artBitmap != null) {
+            @Suppress("DEPRECATION")
+            notification.largeIcon = artBitmap
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                notification.extras.putParcelable(
+                    Notification.EXTRA_LARGE_ICON,
+                    Icon.createWithBitmap(artBitmap)
+                )
             }
         }
 
         // 6. Complete Android 15 Promoted Ongoing (Live Updates) & OnePlus OxygenOS 15 Live Alerts extras
+        val lyricJson = metadata.extras?.getString("lyricInfo")
+            ?: songId?.let { id -> """{"songName":"$title","artist":"$artist","album":"$album","songId":"$id","noLyric":true}""" }
+
         notification.extras.apply {
-            putBoolean(EXTRA_ONGOING, isPlaying)
+            putBoolean(EXTRA_ONGOING, shouldBeOngoing)
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")
+            putString("songName", title)
+            putString("artist", artist)
+            putString("album", album)
+
+            if (lyricJson != null) {
+                putString("lyricInfo", lyricJson)
+            }
+
+            putBoolean(NotificationCompat.EXTRA_SHOW_WHEN, shouldBeOngoing)
+            putBoolean(EXTRA_SHOW_CHRONOMETER, shouldBeOngoing)
 
             if (isLiveEnabled) {
-                putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, isPlaying)
+                putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, shouldBeOngoing)
                 putCharSequence(EXTRA_SHORT_CRITICAL_TEXT, shortCritical)
-                if (isPlaying) {
-                    putBoolean(EXTRA_SHOW_CHRONOMETER, true)
-                }
 
                 // OnePlus OxygenOS 15 & ColorOS 15 Live Alerts / Fluid Cloud capsule keys
-                putBoolean(EXTRA_OPLUS_ONGOING, isPlaying)
-                putBoolean(EXTRA_OPLUS_CAPSULE, isPlaying)
-                putBoolean(EXTRA_OPLUS_COM_CAPSULE, isPlaying)
+                putBoolean(EXTRA_OPLUS_ONGOING, shouldBeOngoing)
+                putBoolean(EXTRA_OPLUS_CAPSULE, shouldBeOngoing)
+                putBoolean(EXTRA_OPLUS_COM_CAPSULE, shouldBeOngoing)
                 putString(EXTRA_OPLUS_CAPSULE_TYPE, "music")
-                putBoolean(EXTRA_LIVE_NOTIFICATION, isPlaying)
-                putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, isPlaying)
+                putBoolean("oplus_media", true)
+                putBoolean(EXTRA_LIVE_NOTIFICATION, shouldBeOngoing)
+                putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, shouldBeOngoing)
             } else {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false)
                 putBoolean(EXTRA_OPLUS_CAPSULE, false)
@@ -217,24 +259,6 @@ class HighSpinLiveNotificationProvider(
                 putInt(NotificationCompat.EXTRA_PROGRESS_MAX, progress.first)
                 putInt(NotificationCompat.EXTRA_PROGRESS, progress.second)
                 putBoolean(NotificationCompat.EXTRA_PROGRESS_INDETERMINATE, false)
-            }
-        }
-
-        // Forward compatibility reflection if method exists on Notification
-        if (isLiveEnabled) {
-            runCatching {
-                val method = notification.javaClass.getMethod(
-                    "setRequestPromotedOngoing",
-                    Boolean::class.javaPrimitiveType
-                )
-                method.invoke(notification, isPlaying)
-            }
-            runCatching {
-                val method = notification.javaClass.getMethod(
-                    "setShortCriticalText",
-                    CharSequence::class.java
-                )
-                method.invoke(notification, shortCritical)
             }
         }
 

@@ -206,14 +206,23 @@ fun TurntableVinyl(
                     )
                 }
 
-                // Center spindle hole and metallic ring
+                // Center spindle hole and metallic brushed ring
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val c = Offset(size.width / 2f, size.height / 2f)
                     drawCircle(
-                        color = Color(0xFFD6D6DF),
+                        brush = Brush.sweepGradient(
+                            listOf(
+                                Color(0xFFF1F5F9),
+                                Color(0xFF94A3B8),
+                                Color(0xFFF1F5F9),
+                                Color(0xFF64748B),
+                                Color(0xFFF1F5F9)
+                            ),
+                            center = c
+                        ),
                         radius = 16.dp.toPx(),
                         center = c,
-                        style = Stroke(width = 2.dp.toPx())
+                        style = Stroke(width = 2.5.dp.toPx())
                     )
                     drawCircle(
                         color = Color(0xFF0A0A0E),

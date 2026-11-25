@@ -32,11 +32,12 @@ import kotlin.math.sin
 
 /**
  * High-performance, hardware-accelerated animated audio visualizer.
- * Supports 4 aesthetic styles:
+ * Supports 5 aesthetic styles:
  * - 0: Dynamic Equalizer Spectrum Bars with floating peak caps
  * - 1: Glowing Multi-Harmonic Neon Waves
  * - 2: Minimalist Dancing Rhythm Dots
  * - 3: Liquid Aura / Harmonic Flow with volumetric fluid bloom
+ * - 4: Orbital Pulsar / Concentric Harmonic Frequency Halo
  */
 @Composable
 fun AudioVisualizer(
@@ -126,6 +127,18 @@ fun AudioVisualizer(
             3 -> {
                 // Style 3: Liquid Aura / Harmonic Flow
                 drawLiquidAura(
+                    width = width,
+                    canvasHeight = canvasHeight,
+                    playFactor = playFactor,
+                    phase1 = phase1,
+                    phase2 = phase2,
+                    primary = primary,
+                    secondary = secondary
+                )
+            }
+            4 -> {
+                // Style 4: Orbital Pulsar / Harmonic Frequency Halo
+                drawOrbitalPulsar(
                     width = width,
                     canvasHeight = canvasHeight,
                     playFactor = playFactor,
@@ -346,5 +359,89 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLiquidAura(
             colors = listOf(primary, secondary, primary)
         ),
         style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbitalPulsar(
+    width: Float,
+    canvasHeight: Float,
+    playFactor: Float,
+    phase1: Float,
+    phase2: Float,
+    primary: Color,
+    secondary: Color
+) {
+    val centerX = width / 2f
+    val centerY = canvasHeight / 2f
+    val maxRadius = (canvasHeight * 0.44f) * playFactor
+
+    // 1. Concentric orbital pulsing rings
+    val ringCount = 3
+    for (r in 1..ringCount) {
+        val norm = r.toFloat() / ringCount
+        val pulse = sin(phase1 + norm * PI.toFloat()) * 0.25f
+        val radius = (maxRadius * norm * (1f + pulse * playFactor)).coerceAtLeast(2.dp.toPx())
+        val alpha = ((1f - norm * 0.45f) * playFactor * (0.6f + 0.4f * pulse)).coerceIn(0.1f, 1f)
+        val strokeW = (2.2.dp.toPx() * (1f - norm * 0.3f)).coerceAtLeast(1.dp.toPx())
+
+        drawCircle(
+            color = if (r % 2 == 1) primary.copy(alpha = alpha) else secondary.copy(alpha = alpha),
+            radius = radius,
+            center = Offset(centerX, centerY),
+            style = Stroke(width = strokeW)
+        )
+    }
+
+    // 2. Mirrored frequency pulsar spikes radiating horizontally
+    val rayCount = 16
+    val halfWidth = (width / 2f) - maxRadius - 12.dp.toPx()
+    if (halfWidth > 20f) {
+        val rayStep = halfWidth / rayCount
+        for (i in 0 until rayCount) {
+            val norm = i.toFloat() / rayCount
+            val harmonic = abs(sin(phase2 + norm * 3f * PI.toFloat()) * cos(phase1 + norm * 2f))
+            val rayH = (canvasHeight * 0.36f * harmonic * playFactor).coerceAtLeast(2.dp.toPx())
+            val strokeW = (rayStep * 0.55f).coerceIn(2.dp.toPx(), 4.dp.toPx())
+            val brush = Brush.verticalGradient(
+                colors = listOf(primary, secondary),
+                startY = centerY - rayH,
+                endY = centerY + rayH
+            )
+
+            // Right side ray
+            val rx = centerX + maxRadius + 8.dp.toPx() + i * rayStep
+            drawLine(
+                brush = brush,
+                start = Offset(rx, centerY - rayH),
+                end = Offset(rx, centerY + rayH),
+                strokeWidth = strokeW,
+                cap = StrokeCap.Round
+            )
+
+            // Left side mirrored ray
+            val lx = centerX - maxRadius - 8.dp.toPx() - i * rayStep
+            drawLine(
+                brush = brush,
+                start = Offset(lx, centerY - rayH),
+                end = Offset(lx, centerY + rayH),
+                strokeWidth = strokeW,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+
+    // 3. Central glowing star core
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                primary.copy(alpha = 0.85f * playFactor),
+                secondary.copy(alpha = 0.35f * playFactor),
+                Color.Transparent
+            ),
+            center = Offset(centerX, centerY),
+            radius = (maxRadius * 0.5f).coerceAtLeast(4.dp.toPx())
+        ),
+        radius = (maxRadius * 0.5f).coerceAtLeast(4.dp.toPx()),
+        center = Offset(centerX, centerY)
     )
 }

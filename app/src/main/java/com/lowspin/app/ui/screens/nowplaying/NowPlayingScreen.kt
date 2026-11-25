@@ -238,6 +238,23 @@ fun NowPlayingScreen(
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
+                // Ambient dynamic back-glow reflecting album palette
+                BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val glowRadius = minOf(maxWidth, maxHeight) * 0.58f
+                    Box(
+                        modifier = Modifier
+                            .size(glowRadius * 2)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        dominant.copy(alpha = if (state.isPlaying) 0.22f else 0.10f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                }
+
                 if (showLyrics && lyrics != null) {
                     LyricsCard(
                         lyrics = lyrics,

@@ -105,6 +105,22 @@ val HighSpinThemes = listOf(
         secondary = Color(0xFF80E5FF),
         surface = Color(0xFF121B26),
         background = Color(0xFF080E16)
+    ),
+    ThemePreset(
+        id = "tokyo",
+        name = "Neon Tokyo",
+        primary = Color(0xFFFFEA00),
+        secondary = Color(0xFF00F0FF),
+        surface = Color(0xFF14141F),
+        background = Color(0xFF0A0A10)
+    ),
+    ThemePreset(
+        id = "velvet",
+        name = "Velvet Twilight",
+        primary = Color(0xFFFF5E7E),
+        secondary = Color(0xFFA55EEA),
+        surface = Color(0xFF1F1424),
+        background = Color(0xFF0F0A12)
     )
 )
 
@@ -147,7 +163,7 @@ class AppearanceSettings(context: Context) {
     private val _visualizerEnabled = MutableStateFlow(prefs.getBoolean(KEY_VISUALIZER, true))
     val visualizerEnabled: StateFlow<Boolean> = _visualizerEnabled.asStateFlow()
 
-    private val _visualizerStyle = MutableStateFlow(prefs.getInt(KEY_VISUALIZER_STYLE, 0).coerceIn(0, 3))
+    private val _visualizerStyle = MutableStateFlow(prefs.getInt(KEY_VISUALIZER_STYLE, 0).coerceIn(0, 4))
     val visualizerStyle: StateFlow<Int> = _visualizerStyle.asStateFlow()
 
     private val _textScale = MutableStateFlow(prefs.getFloat(KEY_TEXT_SCALE, 1f))
@@ -193,7 +209,7 @@ class AppearanceSettings(context: Context) {
         .also { _visualizerEnabled.value = enabled }
 
     fun setVisualizerStyle(style: Int) {
-        val safe = style.coerceIn(0, 3)
+        val safe = style.coerceIn(0, 4)
         store { putInt(KEY_VISUALIZER_STYLE, safe) }
         _visualizerStyle.value = safe
     }
