@@ -13,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import com.lowspin.app.ui.theme.LowspinBackground
 
 /**
  * The Lowspin vinyl: violet disc, two faint grooves, dark label and a small
@@ -36,7 +35,7 @@ fun VinylGlyph(
     )
 
     val accent = MaterialTheme.colorScheme.primary
-    val label = LowspinBackground
+    val label = MaterialTheme.colorScheme.background
 
     Canvas(
         modifier = modifier.graphicsLayer {
@@ -49,18 +48,18 @@ fun VinylGlyph(
 
         drawCircle(color = accent, radius = radius, center = center)
         drawCircle(
-            color = LowspinBackground.copy(alpha = 0.3f),
+            color = label.copy(alpha = 0.3f),
             radius = radius * 0.80f,
             center = center,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
         )
         drawCircle(
-            color = LowspinBackground.copy(alpha = 0.3f),
+            color = label.copy(alpha = 0.3f),
             radius = radius * 0.63f,
             center = center,
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
         )
-        drawCircle(color = LowspinBackground, radius = radius * 0.34f, center = center)
+        drawCircle(color = label, radius = radius * 0.34f, center = center)
         drawCircle(color = accent, radius = radius * 0.085f, center = center)
     }
 }

@@ -84,10 +84,7 @@ import com.lowspin.app.ui.components.AlbumArtImage
 import com.lowspin.app.ui.components.AudioVisualizer
 import com.lowspin.app.ui.components.TurntableVinyl
 import com.lowspin.app.ui.settings.LocalAppearance
-import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
 import kotlin.math.roundToInt

@@ -47,10 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.di.AppContainer
 import com.lowspin.app.media.BandInfo
 import com.lowspin.app.media.EqualizerPresets
-import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -228,7 +225,7 @@ fun EqualizerScreen(
                         colors = SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = LowspinSurfaceElevated
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
 
@@ -262,7 +259,7 @@ fun EqualizerScreen(
                         colors = SliderDefaults.colors(
                             thumbColor = MaterialTheme.colorScheme.primary,
                             activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = LowspinSurfaceElevated
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
@@ -309,7 +306,7 @@ private fun BandSliderRow(
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = LowspinSurfaceElevated
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }

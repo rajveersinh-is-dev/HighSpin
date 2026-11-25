@@ -57,7 +57,6 @@ import com.lowspin.app.ui.components.PlaylistCard
 import com.lowspin.app.ui.components.SectionHeader
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.pressScaleClickable
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -138,8 +137,8 @@ fun SearchScreen(
                     }
                 ),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = LowspinSurfaceElevated,
-                    unfocusedContainerColor = LowspinSurfaceElevated,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     cursorColor = LowspinTextPrimary,
@@ -157,7 +156,7 @@ fun SearchScreen(
                         .fillMaxWidth()
                         .height(2.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    trackColor = LowspinSurfaceElevated
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             }
         }
@@ -286,7 +285,7 @@ private fun RecentSearches(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
-                        .background(LowspinSurfaceElevated)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .pressScaleClickable(onClick = { onPick(search.query) })
                         .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically

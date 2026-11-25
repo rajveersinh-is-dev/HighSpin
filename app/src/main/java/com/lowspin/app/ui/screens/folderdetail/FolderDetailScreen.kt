@@ -44,10 +44,7 @@ import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.pressScaleClickable
-import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatTotalDuration
 
@@ -159,7 +156,7 @@ private fun FolderHero(
             modifier = Modifier
                 .size(120.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(LowspinSurfaceElevated),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             Icon(

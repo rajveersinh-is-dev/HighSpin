@@ -30,8 +30,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.lowspin.app.ui.theme.LowspinAccentPressed
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -159,7 +157,7 @@ fun LikedSongsCard(
                 .clip(RoundedCornerShape(4.dp))
                 .background(
                     Brush.linearGradient(
-                        listOf(LowspinAccentPressed, MaterialTheme.colorScheme.primary)
+                        listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary)
                     )
                 ),
             contentAlignment = Alignment.Center
@@ -206,7 +204,7 @@ fun NewPlaylistCard(
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(LowspinSurfaceElevated),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             Icon(

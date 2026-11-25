@@ -51,8 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration

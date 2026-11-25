@@ -63,9 +63,7 @@ import com.lowspin.app.media.PlaybackService
 import com.lowspin.app.ui.settings.HighSpinThemes
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LowspinAccentShades
-import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import kotlinx.coroutines.Dispatchers

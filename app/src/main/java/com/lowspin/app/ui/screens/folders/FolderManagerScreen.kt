@@ -1,6 +1,5 @@
 package com.lowspin.app.ui.screens.folders
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +45,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.data.scanner.ScanState
 import com.lowspin.app.ui.components.SectionHeader
 import com.lowspin.app.ui.components.VinylGlyph
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -138,7 +136,7 @@ fun FolderManagerScreen(
                     onClick = viewModel::refresh,
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = com.lowspin.app.ui.theme.LowspinSurfaceHigh,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = LowspinTextPrimary
                     )
                 ) {
@@ -193,7 +191,7 @@ private fun FolderRowItem(row: FolderRow, onToggle: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onToggle)
-            .background(LowspinSurfaceElevated)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -234,7 +232,7 @@ private fun FolderRowItem(row: FolderRow, onToggle: () -> Unit) {
                 checkedThumbColor = LowspinOnAccent,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = LowspinSurfaceElevated,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
                 uncheckedBorderColor = LowspinTextMuted
             )
         )

@@ -1,6 +1,5 @@
 package com.lowspin.app.ui.screens.liked
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,9 +42,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.pressScaleClickable
-import com.lowspin.app.ui.theme.LowspinAccentPressed
-import com.lowspin.app.ui.theme.LowspinBackground
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatTotalDuration
 
@@ -175,7 +171,7 @@ private fun LikedHero(
                 .size(180.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
-                    Brush.linearGradient(listOf(LowspinAccentPressed, MaterialTheme.colorScheme.primary))
+                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary))
                 ),
             contentAlignment = Alignment.Center
         ) {

@@ -94,7 +94,6 @@ import com.lowspin.app.ui.screens.settings.SettingsScreen
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LocalListStyle
 import com.lowspin.app.ui.settings.LowspinListStyle
-import com.lowspin.app.ui.theme.LowspinBackground
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
 import kotlinx.coroutines.delay

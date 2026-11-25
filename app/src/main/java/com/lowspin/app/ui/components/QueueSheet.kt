@@ -49,9 +49,6 @@ import androidx.compose.ui.zIndex
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.media.PlaybackController
 import com.lowspin.app.media.PlayerUiState
-import com.lowspin.app.ui.theme.LowspinBackground
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import kotlin.math.roundToInt
@@ -157,7 +154,7 @@ fun QueueSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(LowspinSurfaceElevated)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -256,7 +253,7 @@ fun QueueSheet(
                                 .fillMaxWidth()
                                 .height(64.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isDragging) LowspinSurfaceElevated else Color.Transparent)
+                                .background(if (isDragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
                                 .zIndex(if (isDragging) 1f else 0f)
                                 .padding(horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically

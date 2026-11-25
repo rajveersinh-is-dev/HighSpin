@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.media.PlayerUiState
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -57,12 +56,13 @@ fun MiniPlayer(
 ) {
     val song = state.currentSong ?: return
 
-    val tint = remember(state.dominantColor, song.id) {
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val tint = remember(state.dominantColor, song.id, surfaceVariant) {
         val base = state.dominantColor
             .takeIf { it != 0 }
             ?.let { Color(it) }
             ?: Color(GradientPlaceholder.primaryColor(song.album.ifBlank { song.title }))
-        lerp(base, LowspinSurfaceElevated, 0.45f)
+        lerp(base, surfaceVariant, 0.45f)
     }
     val progress = if (state.durationMs > 0L) {
         (state.positionMs.toFloat() / state.durationMs.toFloat()).coerceIn(0f, 1f)

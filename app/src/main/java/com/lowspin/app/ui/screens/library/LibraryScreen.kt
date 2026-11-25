@@ -73,8 +73,6 @@ import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.VinylGlyph
 import com.lowspin.app.ui.components.pressScaleClickable
 import com.lowspin.app.ui.theme.LowspinOnAccent
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -246,7 +244,7 @@ private fun LibraryHeader(
             DropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { onMenuOpenChange(false) },
-                containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
             ) {
                 DropdownMenuItem(
                     text = { Text("Rescan library", color = LowspinTextPrimary) },
@@ -358,7 +356,7 @@ private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun TabPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val background by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated.copy(alpha = 0.70f),
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
         animationSpec = tween(180),
         label = "tabBackground"
     )
@@ -513,7 +511,7 @@ private fun AlbumsTab(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(LowspinSurfaceElevated),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -588,7 +586,7 @@ private fun ArtistsTab(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(CircleShape)
-                                .background(LowspinSurfaceElevated),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -655,7 +653,7 @@ private fun FoldersTab(
                         modifier = Modifier
                             .size(56.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(LowspinSurfaceElevated),
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -743,7 +741,7 @@ private fun ScanBanner(scanState: ScanState) {
                         .height(2.dp)
                         .clip(RoundedCornerShape(2.dp)),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    trackColor = LowspinSurfaceElevated
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -772,7 +770,7 @@ private fun ScanBanner(scanState: ScanState) {
                         .height(2.dp)
                         .clip(RoundedCornerShape(2.dp)),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    trackColor = LowspinSurfaceElevated
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -846,7 +844,7 @@ private fun EmptyLibrary(onRefresh: () -> Unit) {
             onClick = onRefresh,
             shape = RoundedCornerShape(24.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
                 contentColor = LowspinTextPrimary
             )
         ) {

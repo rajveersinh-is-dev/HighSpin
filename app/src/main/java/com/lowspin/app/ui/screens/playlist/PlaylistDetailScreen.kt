@@ -1,6 +1,5 @@
 package com.lowspin.app.ui.screens.playlist
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -61,8 +60,6 @@ import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.ui.components.CollageArt
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.pressScaleClickable
-import com.lowspin.app.ui.theme.LowspinBackground
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatTotalDuration
@@ -144,7 +141,7 @@ fun PlaylistDetailScreen(
                     DropdownMenu(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f)
                     ) {
                         DropdownMenuItem(
                             text = { Text("Rename playlist", color = LowspinTextPrimary) },

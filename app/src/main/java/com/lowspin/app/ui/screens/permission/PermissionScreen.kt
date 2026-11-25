@@ -1,7 +1,5 @@
 package com.lowspin.app.ui.screens.permission
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
-import com.lowspin.app.ui.theme.LowspinAccentPressed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,8 +29,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.lowspin.app.ui.theme.LowspinBackground
-import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
@@ -48,9 +44,9 @@ fun PermissionScreen(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        com.lowspin.app.ui.theme.LowspinAccentPressed.copy(alpha = 0.25f),
-                        LowspinBackground,
-                        LowspinBackground
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.background
                     )
                 )
             )
@@ -68,13 +64,13 @@ fun PermissionScreen(
                 Modifier
                     .size(96.dp)
                     .clip(CircleShape)
-                    .background(com.lowspin.app.ui.theme.LowspinSurfaceHigh),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Rounded.GraphicEq,
                     contentDescription = null,
-                    tint = LowspinOnAccent,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(52.dp)
                 )
             }
@@ -108,7 +104,7 @@ fun PermissionScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = com.lowspin.app.ui.theme.LowspinSurfaceHigh,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = LowspinTextPrimary
                 )
             ) {

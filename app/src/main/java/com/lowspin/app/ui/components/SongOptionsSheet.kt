@@ -1,6 +1,5 @@
 package com.lowspin.app.ui.components
 
-import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lowspin.app.data.db.PlaylistSummary
 import com.lowspin.app.data.db.SongEntity
-import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
