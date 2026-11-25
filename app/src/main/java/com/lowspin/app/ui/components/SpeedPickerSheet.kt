@@ -63,6 +63,7 @@ fun SpeedPickerSheet(
     currentPitch: Float = 1f,
     onSpeedSelected: (Float) -> Unit,
     onPitchSelected: (Float) -> Unit = {},
+    onSpeedAndPitchSelected: ((Float, Float) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -72,7 +73,7 @@ fun SpeedPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.98f)
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.98f)
     ) {
         Column(
             modifier = Modifier
@@ -97,8 +98,12 @@ fun SpeedPickerSheet(
                     onClick = {
                         speedVal = 1f
                         pitchVal = 1f
-                        onSpeedSelected(1f)
-                        onPitchSelected(1f)
+                        if (onSpeedAndPitchSelected != null) {
+                            onSpeedAndPitchSelected(1f, 1f)
+                        } else {
+                            onSpeedSelected(1f)
+                            onPitchSelected(1f)
+                        }
                     }
                 ) {
                     Text("Reset", color = MaterialTheme.colorScheme.primary)
@@ -127,13 +132,17 @@ fun SpeedPickerSheet(
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(
-                                if (active) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated
+                                if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                             )
                             .clickable {
                                 speedVal = preset.speed
                                 pitchVal = preset.pitch
-                                onSpeedSelected(preset.speed)
-                                onPitchSelected(preset.pitch)
+                                if (onSpeedAndPitchSelected != null) {
+                                    onSpeedAndPitchSelected(preset.speed, preset.pitch)
+                                } else {
+                                    onSpeedSelected(preset.speed)
+                                    onPitchSelected(preset.pitch)
+                                }
                             }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -160,13 +169,17 @@ fun SpeedPickerSheet(
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(
-                                if (active) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated
+                                if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                             )
                             .clickable {
                                 speedVal = preset.speed
                                 pitchVal = preset.pitch
-                                onSpeedSelected(preset.speed)
-                                onPitchSelected(preset.pitch)
+                                if (onSpeedAndPitchSelected != null) {
+                                    onSpeedAndPitchSelected(preset.speed, preset.pitch)
+                                } else {
+                                    onSpeedSelected(preset.speed)
+                                    onPitchSelected(preset.pitch)
+                                }
                             }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -276,7 +289,7 @@ fun SpeedPickerSheet(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.primary else LowspinSurfaceElevated
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                                 )
                                 .clickable {
                                     speedVal = speed

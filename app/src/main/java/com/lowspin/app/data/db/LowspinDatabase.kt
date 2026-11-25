@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExcludedFolderEntity::class,
         HiddenSongEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class LowspinDatabase : RoomDatabase() {
@@ -106,6 +106,18 @@ abstract class LowspinDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds playbackPitch column to playback_state to persist independent
+         * audio DSP pitch settings across restarts.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `playback_state` ADD COLUMN `playbackPitch` REAL NOT NULL DEFAULT 1.0"
+                )
+            }
+        }
+
         fun get(context: Context): LowspinDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -117,7 +129,8 @@ abstract class LowspinDatabase : RoomDatabase() {
                         MIGRATION_1_2,
                         MIGRATION_2_3,
                         MIGRATION_3_4,
-                        MIGRATION_4_5
+                        MIGRATION_4_5,
+                        MIGRATION_5_6
                     )
                     .build()
                     .also { instance = it }

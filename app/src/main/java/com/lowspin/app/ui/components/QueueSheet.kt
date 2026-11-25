@@ -86,7 +86,7 @@ fun QueueSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.96f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
         dragHandle = null
     ) {
         Column(

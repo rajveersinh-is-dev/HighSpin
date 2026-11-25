@@ -77,7 +77,7 @@ fun SongOptionsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
         contentColor = LowspinTextPrimary,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
@@ -326,7 +326,7 @@ fun CreatePlaylistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Text(
                 text = "New playlist",

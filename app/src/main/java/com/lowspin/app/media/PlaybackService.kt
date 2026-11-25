@@ -234,6 +234,7 @@ class PlaybackService : MediaSessionService() {
         val shuffle = player.shuffleModeEnabled
         val repeat = player.repeatMode
         val speed = player.playbackParameters.speed
+        val pitch = player.playbackParameters.pitch
 
         val db = container.database
         val existing = db.playbackStateDao().get() ?: PlaybackStateEntity()
@@ -244,6 +245,7 @@ class PlaybackService : MediaSessionService() {
                 shuffleEnabled = shuffle,
                 repeatMode = repeat,
                 playbackSpeed = speed,
+                playbackPitch = pitch,
                 updatedAt = System.currentTimeMillis()
             )
         )

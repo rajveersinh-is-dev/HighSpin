@@ -168,7 +168,7 @@ fun SettingsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { appearance.setTheme(index) }
                                 .background(
-                                    if (selected) LowspinSurfaceHigh else androidx.compose.ui.graphics.Color.Transparent
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Transparent
                                 )
                                 .padding(8.dp)
                         ) {
@@ -242,7 +242,7 @@ fun SettingsScreen(
                 val cacheFormatted = if (cacheBytes < 1024 * 1024) {
                     "${cacheBytes / 1024} KB"
                 } else {
-                    String.format("%.1f MB", cacheBytes.toDouble() / (1024 * 1024))
+                    String.format(java.util.Locale.US, "%.1f MB", cacheBytes.toDouble() / (1024 * 1024))
                 }
 
                 Row(
@@ -275,7 +275,7 @@ fun SettingsScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = LowspinSurfaceHigh,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
@@ -323,7 +323,7 @@ fun SettingsScreen(
                         },
                         enabled = !isRescanning,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = LowspinSurfaceHigh,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
@@ -458,7 +458,7 @@ private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(LowspinSurfaceHigh)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         content = content
     )
@@ -486,7 +486,7 @@ private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
                 checkedThumbColor = LowspinOnAccent,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = LowspinSurfaceHigh
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
     }
@@ -517,7 +517,7 @@ private fun ChoiceRow(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .background(
-                            if (active) MaterialTheme.colorScheme.primary else LowspinSurfaceHigh
+                            if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                         )
                         .clickable { onSelect(value) }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
@@ -535,7 +535,7 @@ private fun DiagnosticCard(title: String, value: String) {
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(LowspinSurfaceHigh)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
@@ -560,7 +560,7 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = LowspinSurfaceHigh,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = LowspinTextPrimary
         )
     ) {

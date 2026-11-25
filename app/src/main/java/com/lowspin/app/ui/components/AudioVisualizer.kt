@@ -44,16 +44,17 @@ fun AudioVisualizer(
     barCount: Int = 26,
     style: Int = 0,
     accentColor: Color = MaterialTheme.colorScheme.primary,
-    height: Dp = 48.dp
+    height: Dp = 48.dp,
+    reduceMotion: Boolean = false
 ) {
     val playFactor by animateFloatAsState(
         targetValue = if (isPlaying) 1f else 0.08f,
-        animationSpec = tween(durationMillis = 400),
+        animationSpec = if (reduceMotion) tween(durationMillis = 0) else tween(durationMillis = 400),
         label = "playFactor"
     )
 
     val transition = rememberInfiniteTransition(label = "visualizerPhase")
-    val phase1 by transition.animateFloat(
+    val animPhase1 by transition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
@@ -62,7 +63,7 @@ fun AudioVisualizer(
         ),
         label = "phase1"
     )
-    val phase2 by transition.animateFloat(
+    val animPhase2 by transition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
@@ -71,6 +72,9 @@ fun AudioVisualizer(
         ),
         label = "phase2"
     )
+
+    val phase1 = if (reduceMotion) 1f else animPhase1
+    val phase2 = if (reduceMotion) 1.5f else animPhase2
 
     // Precalculated frequency multipliers to give realistic equalizer spectrum shaping
     // (higher bass on left, dynamic mids, taper at high frequencies)

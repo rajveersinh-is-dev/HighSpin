@@ -76,7 +76,7 @@ fun ArtistDetailScreen(
                     Brush.verticalGradient(
                         listOf(
                             seedColor.copy(alpha = 0.55f),
-                            LowspinBackground.copy(alpha = 0.95f)
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
                         )
                     )
                 )
@@ -225,7 +225,7 @@ private fun ArtistHero(
                 onClick = onShuffle,
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
                     contentColor = LowspinTextPrimary
                 ),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)

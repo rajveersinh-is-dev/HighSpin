@@ -66,8 +66,8 @@ fun LikedSongsScreen(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            LowspinAccentPressed.copy(alpha = 0.45f),
-                            LowspinBackground
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f),
+                            MaterialTheme.colorScheme.background
                         )
                     )
                 )
@@ -237,7 +237,7 @@ private fun LikedHero(
                 onClick = onShuffle,
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
                     contentColor = LowspinTextPrimary
                 ),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)

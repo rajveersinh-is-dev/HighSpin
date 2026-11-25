@@ -51,7 +51,8 @@ fun TurntableVinyl(
     albumSeed: String,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
-    dominantColor: Color = MaterialTheme.colorScheme.primary
+    dominantColor: Color = MaterialTheme.colorScheme.primary,
+    reduceMotion: Boolean = false
 ) {
     val repository = LocalAlbumArtRepository.current
     val bitmap by produceState<Bitmap?>(initialValue = null, songId) {
@@ -70,10 +71,10 @@ fun TurntableVinyl(
         label = "vinylSpinAngle"
     )
 
-    // Needle arm angle: 0deg resting, 28deg on record
+    // Needle arm angle: 0deg resting, 26deg on record
     val needleAngle by animateFloatAsState(
         targetValue = if (isPlaying) 26f else 0f,
-        animationSpec = tween(durationMillis = 600),
+        animationSpec = if (reduceMotion) tween(durationMillis = 0) else tween(durationMillis = 600),
         label = "tonearmAngle"
     )
 
@@ -88,7 +89,7 @@ fun TurntableVinyl(
         label = "glowPulse"
     )
 
-    val currentRotation = if (isPlaying) spinAngle else 0f
+    val currentRotation = if (isPlaying && !reduceMotion) spinAngle else 0f
     val accent = dominantColor
 
     Box(

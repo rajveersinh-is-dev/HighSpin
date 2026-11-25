@@ -177,4 +177,38 @@ class LrcParserTest {
         assertNotNull(lyrics)
         assertEquals(0L, lyrics!!.lines[0].timeMs)
     }
+
+    @Test
+    fun parse_blankLyricsLines_parsedWithEmptyText() {
+        val lrc = """
+            [00:05.00]First verse
+            [00:10.00]
+            [00:15.00]Second verse
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNotNull(lyrics)
+        assertTrue(lyrics!!.synced)
+        assertEquals(3, lyrics.lines.size)
+        assertEquals("First verse", lyrics.lines[0].text)
+        assertEquals("", lyrics.lines[1].text)
+        assertEquals("Second verse", lyrics.lines[2].text)
+    }
+
+    @Test
+    fun parse_nonMonotonicTimestamps_correctlySorted() {
+        val lrc = """
+            [00:30.00]Third line
+            [00:10.00]First line
+            [00:20.00]Second line
+        """.trimIndent()
+
+        val lyrics = LrcParser.parse(lrc)
+        assertNotNull(lyrics)
+        assertTrue(lyrics!!.synced)
+        assertEquals(3, lyrics.lines.size)
+        assertEquals("First line", lyrics.lines[0].text)
+        assertEquals("Second line", lyrics.lines[1].text)
+        assertEquals("Third line", lyrics.lines[2].text)
+    }
 }

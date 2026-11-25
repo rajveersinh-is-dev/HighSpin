@@ -138,7 +138,9 @@ class PlaybackController(
             )
             mediaController.shuffleModeEnabled = saved.shuffleEnabled
             mediaController.repeatMode = saved.repeatMode
-            mediaController.setPlaybackSpeed(saved.playbackSpeed)
+            val safeSpeed = saved.playbackSpeed.coerceIn(0.5f, 2.5f)
+            val safePitch = saved.playbackPitch.coerceIn(0.5f, 2.0f)
+            mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(safeSpeed, safePitch)
             mediaController.prepare()
         }
         syncState()
@@ -358,6 +360,7 @@ class PlaybackController(
         val safePitch = pitch.coerceIn(0.5f, 2.0f)
         mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(currentSpeed, safePitch)
         _state.update { it.copy(playbackPitch = safePitch) }
+        persistModes()
     }
 
     fun setPlaybackPitch(pitch: Float) = setPitch(pitch)
@@ -454,6 +457,7 @@ class PlaybackController(
         val shuffle = mediaController.shuffleModeEnabled
         val repeat = mediaController.repeatMode
         val speed = mediaController.playbackParameters.speed
+        val pitch = mediaController.playbackParameters.pitch
         scope.launch {
             val existing = database.playbackStateDao().get() ?: PlaybackStateEntity()
             database.playbackStateDao().upsert(
@@ -461,6 +465,7 @@ class PlaybackController(
                     shuffleEnabled = shuffle,
                     repeatMode = repeat,
                     playbackSpeed = speed,
+                    playbackPitch = pitch,
                     updatedAt = System.currentTimeMillis()
                 )
             )
@@ -475,6 +480,7 @@ class PlaybackController(
         val shuffle = mediaController.shuffleModeEnabled
         val repeat = mediaController.repeatMode
         val speed = mediaController.playbackParameters.speed
+        val pitch = mediaController.playbackParameters.pitch
 
         scope.launch {
             val existing = database.playbackStateDao().get() ?: PlaybackStateEntity()
@@ -485,6 +491,7 @@ class PlaybackController(
                     shuffleEnabled = shuffle,
                     repeatMode = repeat,
                     playbackSpeed = speed,
+                    playbackPitch = pitch,
                     sourceLabel = currentSourceLabel,
                     updatedAt = System.currentTimeMillis()
                 )

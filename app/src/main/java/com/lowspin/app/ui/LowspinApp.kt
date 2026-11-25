@@ -302,10 +302,10 @@ fun LowspinApp(container: AppContainer) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(LowspinBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Scaffold(
-            containerColor = LowspinBackground,
+            containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
                 if (currentSong != null) {
                     MiniPlayer(
@@ -706,6 +706,9 @@ fun LowspinApp(container: AppContainer) {
             },
             onPitchSelected = { pitch ->
                 container.playbackController.setPlaybackPitch(pitch)
+            },
+            onSpeedAndPitchSelected = { speed, pitch ->
+                container.playbackController.setSpeedAndPitch(speed, pitch)
             },
             onDismiss = { showSpeedSheet = false }
         )

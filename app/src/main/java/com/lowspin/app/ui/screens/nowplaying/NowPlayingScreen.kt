@@ -120,8 +120,8 @@ fun NowPlayingScreen(
     val visualizerEnabled by appearance.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerStyle by appearance.visualizerStyle.collectAsStateWithLifecycle()
     val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
-
-    var turntableMode by rememberSaveable { mutableStateOf(false) }
+    val turntableMode by appearance.turntableMode.collectAsStateWithLifecycle()
+    val reduceMotion by appearance.reduceMotion.collectAsStateWithLifecycle()
 
     val dominant = remember(state.dominantColor, song.id) {
         state.dominantColor
@@ -130,7 +130,7 @@ fun NowPlayingScreen(
             ?: Color(GradientPlaceholder.primaryColor(song.album.ifBlank { song.title }))
     }
 
-    val baseBg = if (pureBlack) Color(0xFF000000) else LowspinBackground
+    val baseBg = if (pureBlack) Color(0xFF000000) else MaterialTheme.colorScheme.background
     val top = remember(dominant, pureBlack) {
         if (pureBlack) lerp(dominant, Color(0xFF000000), 0.65f)
         else lerp(dominant, baseBg, 0.20f)
@@ -201,7 +201,7 @@ fun NowPlayingScreen(
                 }
 
                 // Turntable Vinyl toggle button
-                IconButton(onClick = { turntableMode = !turntableMode }) {
+                IconButton(onClick = { appearance.setTurntableMode(!turntableMode) }) {
                     Icon(
                         imageVector = Icons.Rounded.Album,
                         contentDescription = if (turntableMode) "Switch to Album Art" else "Switch to Turntable Vinyl",
@@ -253,6 +253,7 @@ fun NowPlayingScreen(
                         albumSeed = song.album.ifBlank { song.title },
                         isPlaying = state.isPlaying,
                         dominantColor = dominant,
+                        reduceMotion = reduceMotion,
                         modifier = Modifier.fillMaxSize(0.95f)
                     )
                 } else {
@@ -316,7 +317,7 @@ fun NowPlayingScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(LowspinSurfaceHigh)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .clickable(onClick = onSongInfoClick)
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
@@ -332,7 +333,7 @@ fun NowPlayingScreen(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(LowspinSurfaceHigh)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .clickable(onClick = onSleepClick)
                             .padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -360,6 +361,7 @@ fun NowPlayingScreen(
                     isPlaying = state.isPlaying,
                     style = visualizerStyle,
                     accentColor = MaterialTheme.colorScheme.primary,
+                    reduceMotion = reduceMotion,
                     height = 36.dp
                 )
             } else {
@@ -443,7 +445,7 @@ fun NowPlayingScreen(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
-                        .background(LowspinSurfaceHigh)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onSpeedClick)
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -509,7 +511,7 @@ private fun LyricsCard(
 
     LaunchedEffect(activeIndex) {
         if (activeIndex >= 0 && isPlaying) {
-            listState.animateScrollToItem(activeIndex, scrollOffset = -80)
+            listState.animateScrollToItem(activeIndex, scrollOffset = 0)
         }
     }
 
@@ -517,7 +519,7 @@ private fun LyricsCard(
         modifier = Modifier
             .fillMaxSize(0.96f)
             .clip(RoundedCornerShape(20.dp))
-            .background(LowspinSurfaceHigh.copy(alpha = 0.95f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
             .padding(16.dp)
     ) {
         if (lyrics.synced) {
@@ -528,7 +530,11 @@ private fun LyricsCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { onSeek(line.timeMs) }
+                            .clickable {
+                                if (line.timeMs >= 0) {
+                                    onSeek(line.timeMs)
+                                }
+                            }
                             .background(
                                 if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                                 else Color.Transparent
@@ -537,7 +543,7 @@ private fun LyricsCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = line.text,
+                            text = line.text.ifBlank { "♪" },
                             style = if (isActive) {
                                 MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,

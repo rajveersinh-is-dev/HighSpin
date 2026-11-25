@@ -77,7 +77,7 @@ fun EqualizerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LowspinBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
         Row(
@@ -107,7 +107,7 @@ fun EqualizerScreen(
                     checkedThumbColor = LowspinOnAccent,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
                     uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    uncheckedTrackColor = LowspinSurfaceHigh
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 modifier = Modifier.padding(end = 12.dp)
             )
@@ -136,7 +136,7 @@ fun EqualizerScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary else LowspinSurfaceHigh
+                                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                             )
                             .clickable(enabled = enabled) {
                                 equalizerSettings.setPreset(index)
@@ -165,7 +165,7 @@ fun EqualizerScreen(
 
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = LowspinSurfaceHigh),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -196,7 +196,7 @@ fun EqualizerScreen(
 
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = LowspinSurfaceHigh),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {

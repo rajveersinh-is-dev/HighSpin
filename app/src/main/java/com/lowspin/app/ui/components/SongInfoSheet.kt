@@ -89,7 +89,7 @@ fun SongInfoSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.98f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.98f),
         contentColor = LowspinTextPrimary,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
@@ -143,7 +143,7 @@ fun SongInfoSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(LowspinSurfaceElevated)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(16.dp)
             ) {
                 Column {
@@ -175,7 +175,7 @@ fun SongInfoSheet(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(
                                     if (isLossless) MaterialTheme.colorScheme.primary
-                                    else LowspinSurfaceHigh
+                                    else MaterialTheme.colorScheme.surfaceVariant
                                 )
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
@@ -217,7 +217,7 @@ fun SongInfoSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(LowspinSurfaceElevated)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(16.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -233,13 +233,21 @@ fun SongInfoSheet(
                         String.format(Locale.US, "%.2f MB", bytes.toDouble() / (1024 * 1024))
                     } ?: "Unknown size"
 
+                    val trackDisplay = when {
+                        song.trackNumber > 0 && song.discNumber > 0 -> "#${song.trackNumber} (Disc ${song.discNumber})"
+                        song.trackNumber > 0 -> "#${song.trackNumber}"
+                        song.discNumber > 0 -> "Disc ${song.discNumber}"
+                        else -> "Not tagged"
+                    }
+
+                    val resolvedPath = song.matchKey.ifBlank {
+                        if (song.folderPath.isNotBlank()) "${song.folderPath}/${song.title}" else "Unknown"
+                    }
+
                     DetailRow(label = "File Size", value = fileSizeFormatted)
                     DetailRow(label = "MIME Type", value = song.mimeType)
                     DetailRow(label = "Folder", value = song.folderName)
-                    DetailRow(
-                        label = "Track / Disc",
-                        value = "#${song.trackNumber.takeIf { it > 0 } ?: 1} (Disc ${song.discNumber.takeIf { it > 0 } ?: 1})"
-                    )
+                    DetailRow(label = "Track / Disc", value = trackDisplay)
                     if (song.year > 0) {
                         DetailRow(label = "Release Year", value = song.year.toString())
                     }
@@ -247,7 +255,7 @@ fun SongInfoSheet(
                         val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                         DetailRow(label = "Added to Device", value = sdf.format(Date(song.dateAdded * 1000)))
                     }
-                    DetailRow(label = "Location Path", value = song.folderPath)
+                    DetailRow(label = "File Path", value = resolvedPath)
                 }
             }
 
@@ -280,8 +288,11 @@ fun SongInfoSheet(
 
                 OutlinedButton(
                     onClick = {
+                        val resolvedPath = song.matchKey.ifBlank {
+                            if (song.folderPath.isNotBlank()) "${song.folderPath}/${song.title}" else song.title
+                        }
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                        val clip = ClipData.newPlainText("Song Path", "${song.folderPath}/${song.title}")
+                        val clip = ClipData.newPlainText("Song Path", resolvedPath)
                         clipboard?.setPrimaryClip(clip)
                         Toast.makeText(context, "Path copied to clipboard", Toast.LENGTH_SHORT).show()
                     },
@@ -364,14 +375,22 @@ private fun extractAudioSpecs(context: Context, song: SongEntity): AudioTechnica
         }
     } catch (_: Throwable) {
         // Fallback to checking local file if accessible
-        runCatching {
-            val f = File(song.folderPath)
-            if (f.exists()) fileSize = f.length()
+    }
+
+    if (fileSize <= 0L) {
+        val candidatePath = song.matchKey.ifBlank {
+            if (song.folderPath.isNotBlank()) "${song.folderPath}/${song.title}" else ""
+        }
+        if (candidatePath.isNotBlank()) {
+            runCatching {
+                val f = File(candidatePath)
+                if (f.exists() && f.isFile) fileSize = f.length()
+            }
         }
     }
 
+    val retriever = MediaMetadataRetriever()
     try {
-        val retriever = MediaMetadataRetriever()
         retriever.setDataSource(context, Uri.parse(song.contentUri))
         val rawBitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
         bitrateKbps = rawBitrate?.toIntOrNull()?.let { it / 1000 }
@@ -380,8 +399,11 @@ private fun extractAudioSpecs(context: Context, song: SongEntity): AudioTechnica
             val rawSampleRate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
             sampleRateHz = rawSampleRate?.toIntOrNull()
         }
-        retriever.release()
-    } catch (_: Throwable) {}
+    } catch (_: Throwable) {
+        // Protected or corrupt media stream
+    } finally {
+        runCatching { retriever.release() }
+    }
 
     return AudioTechnicalSpecs(
         formatBadge = deriveFormatFromMime(song.mimeType),

@@ -102,7 +102,7 @@ fun PlaylistDetailScreen(
                     Brush.verticalGradient(
                         listOf(
                             seedColor.copy(alpha = 0.55f),
-                            LowspinBackground.copy(alpha = 0.9f)
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.9f)
                         )
                     )
                 )
@@ -296,7 +296,7 @@ fun PlaylistDetailScreen(
     if (showDelete) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = {
                 Text(
                     text = "Delete playlist?",
@@ -407,7 +407,7 @@ private fun PlaylistHero(
                 onClick = onShuffle,
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
                     contentColor = LowspinTextPrimary
                 ),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
@@ -443,7 +443,7 @@ private fun RenamePlaylistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = LowspinSurfaceHigh.copy(alpha = 0.94f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Text(
                 text = "Rename playlist",

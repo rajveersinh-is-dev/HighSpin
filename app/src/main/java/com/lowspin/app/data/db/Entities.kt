@@ -106,6 +106,7 @@ data class PlaybackStateEntity(
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = 0,
     val playbackSpeed: Float = 1f,
+    val playbackPitch: Float = 1f,
     val sourceLabel: String = "Your library",
     val updatedAt: Long = 0L
 )
