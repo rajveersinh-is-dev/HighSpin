@@ -94,6 +94,7 @@ class PlaybackService : MediaSessionService() {
         })
 
         createNotificationChannel()
+        HighSpinLiveNotificationProvider.publishPlaybackShortcut(this)
         val notificationProvider = HighSpinLiveNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
 
@@ -119,12 +120,11 @@ class PlaybackService : MediaSessionService() {
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
 
-        // Clean up legacy channels that were stuck on lower importance
-        runCatching {
-            manager.deleteNotificationChannel(HighSpinLiveNotificationProvider.LEGACY_NOTIFICATION_CHANNEL_ID)
-        }
-        runCatching {
-            manager.deleteNotificationChannel(HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_ID)
+        // Clean up legacy and previous channels that were stuck on lower importance
+        for (oldChannelId in HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS) {
+            runCatching {
+                manager.deleteNotificationChannel(oldChannelId)
+            }
         }
 
         // If the current channel exists with importance lower than IMPORTANCE_HIGH, delete it so it can be recreated

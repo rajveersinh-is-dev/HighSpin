@@ -1,7 +1,6 @@
 # HighSpin Proguard/R8 optimization rules
 -keep class com.lowspin.app.data.db.** { *; }
--keep class com.lowspin.app.media.PlaybackService { *; }
--keep class com.lowspin.app.media.ArtworkProvider { *; }
+-keep class com.lowspin.app.media.** { *; }
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
 # Keep Room generated migrations and schemas

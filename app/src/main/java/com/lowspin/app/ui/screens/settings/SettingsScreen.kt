@@ -437,6 +437,25 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ActionButton("Open playback channel settings") {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                putExtra(Settings.EXTRA_CHANNEL_ID, PlaybackService.NOTIFICATION_CHANNEL_ID)
+                            }
+                        )
+                    }.onFailure {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 ActionButton("Open bubble settings") {
                     runCatching {

@@ -14,16 +14,21 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v3",
+            "com.lowspin.app.playback.live.v4",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
-            "com.lowspin.app.playback.live",
-            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_ID
+            "com.lowspin.app.playback_bubble",
+            HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
         )
-        assertEquals(
-            "com.lowspin.app.media",
-            HighSpinLiveNotificationProvider.LEGACY_NOTIFICATION_CHANNEL_ID
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v3")
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live")
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.media")
         )
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
         assertEquals(
@@ -73,6 +78,34 @@ class LiveNotificationTest {
         assertEquals(
             "capsule_content",
             HighSpinLiveNotificationProvider.EXTRA_CAPSULE_CONTENT
+        )
+        assertEquals(
+            "capsule_action",
+            HighSpinLiveNotificationProvider.EXTRA_CAPSULE_ACTION
+        )
+        assertEquals(
+            "oplus_capsule_action",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_ACTION
+        )
+        assertEquals(
+            "capsule_icon",
+            HighSpinLiveNotificationProvider.EXTRA_CAPSULE_ICON
+        )
+        assertEquals(
+            "oplus_capsule_icon",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_ICON
+        )
+        assertEquals(
+            "oplus.pantanal.support",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_PANTANAL_SUPPORT
+        )
+        assertEquals(
+            "com.oplus.pantanal.support",
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_PANTANAL_SUPPORT
+        )
+        assertEquals(
+            "oplus.pantanal.type",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_PANTANAL_TYPE
         )
         assertEquals(
             "is_live_notification",
@@ -282,5 +315,41 @@ class LiveNotificationTest {
 
         // Verifies no crash on arbitrary objects lacking the reflection target
         HighSpinLiveNotificationProvider.applyPromotedOngoingViaReflection("ArbitraryString", true)
+    }
+
+    @Test
+    fun liveNotification_internalFieldsReflection_safeOnMockNotification() {
+        class MockNotificationWithFields {
+            @JvmField
+            var mGroupKey: String? = "media3_group_key"
+            @JvmField
+            var mShortcutId: String? = null
+            @JvmField
+            var mChannelId: String? = "old_channel"
+            @JvmField
+            var mBubbleMetadata: Any? = null
+        }
+
+        val mock = MockNotificationWithFields()
+        assertEquals("media3_group_key", mock.mGroupKey)
+        assertNull(mock.mShortcutId)
+
+        // Clear group
+        val groupField = mock.javaClass.getDeclaredField("mGroupKey")
+        groupField.isAccessible = true
+        groupField.set(mock, null)
+        assertNull(mock.mGroupKey)
+
+        // Set shortcut ID
+        val shortcutField = mock.javaClass.getDeclaredField("mShortcutId")
+        shortcutField.isAccessible = true
+        shortcutField.set(mock, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
+        assertEquals(HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID, mock.mShortcutId)
+
+        // Set channel ID
+        val channelField = mock.javaClass.getDeclaredField("mChannelId")
+        channelField.isAccessible = true
+        channelField.set(mock, HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID)
+        assertEquals(HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID, mock.mChannelId)
     }
 }

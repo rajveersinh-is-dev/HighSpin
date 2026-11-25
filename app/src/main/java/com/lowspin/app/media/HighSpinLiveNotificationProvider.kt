@@ -11,6 +11,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
@@ -38,9 +41,11 @@ import java.io.File
  * 5. DefaultMediaNotificationProvider hardcodes [Notification.FLAG_ONGOING_EVENT] to false
  *    and groups children with "media3_group_key", which causes Android 15 Promoted Ongoing
  *    (Notification.hasPromotableCharacteristics) and OnePlus OxygenOS 15 to reject the live capsule.
- *    We clear grouping and enforce [Notification.FLAG_ONGOING_EVENT] whenever playback is active.
- * 6. OnePlus OxygenOS 15 / ColorOS 15 Fluid Cloud & Live Alert capsule keys are supplied.
- * 7. Android 11+ Notification Bubbles metadata is attached with a mutable PendingIntent.
+ *    We clear grouping, enforce [Notification.FLAG_ONGOING_EVENT] whenever playback is active,
+ *    and clear colorization so promotable criteria are fully satisfied.
+ * 6. OnePlus OxygenOS 15 / ColorOS 15 Fluid Cloud & Live Alert capsule keys, icons, and actions are supplied.
+ * 7. Android 11+ Notification Bubbles are fully enabled by publishing a registered dynamic shortcut
+ *    and binding matching shortcutId and BubbleMetadata.
  * 8. Uses native chronometer ticking so the status bar and notification track
  *    real-time playback elapsed duration without waking the CPU every second.
  * 9. Respects user toggle in [AppearanceSettings.liveNotifications].
@@ -52,9 +57,13 @@ class HighSpinLiveNotificationProvider(
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v3"
-        const val PREVIOUS_NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live"
-        const val LEGACY_NOTIFICATION_CHANNEL_ID = "com.lowspin.app.media"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v4"
+        const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
+        val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v3",
+            "com.lowspin.app.playback.live",
+            "com.lowspin.app.media"
+        )
 
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText"
@@ -70,6 +79,13 @@ class HighSpinLiveNotificationProvider(
         const val EXTRA_OPLUS_CAPSULE_STATUS = "oplus_capsule_status"
         const val EXTRA_CAPSULE_TITLE = "capsule_title"
         const val EXTRA_CAPSULE_CONTENT = "capsule_content"
+        const val EXTRA_CAPSULE_ACTION = "capsule_action"
+        const val EXTRA_OPLUS_CAPSULE_ACTION = "oplus_capsule_action"
+        const val EXTRA_CAPSULE_ICON = "capsule_icon"
+        const val EXTRA_OPLUS_CAPSULE_ICON = "oplus_capsule_icon"
+        const val EXTRA_OPLUS_PANTANAL_SUPPORT = "oplus.pantanal.support"
+        const val EXTRA_COM_OPLUS_PANTANAL_SUPPORT = "com.oplus.pantanal.support"
+        const val EXTRA_OPLUS_PANTANAL_TYPE = "oplus.pantanal.type"
         const val EXTRA_LIVE_NOTIFICATION = "is_live_notification"
         const val EXTRA_ANDROID_LIVE_NOTIFICATION = "android.liveNotification"
 
@@ -114,11 +130,45 @@ class HighSpinLiveNotificationProvider(
         }
 
         /**
+         * Publishes a long-lived dynamic shortcut to ShortcutManagerCompat.
+         * On Android 11+ (API 30+), notifications MUST be associated with a valid
+         * registered dynamic shortcut in order to be eligible for Notification Bubbles.
+         */
+        fun publishPlaybackShortcut(context: Context) {
+            runCatching {
+                val shortcutIntent = Intent(context, MainActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+
+                val person = Person.Builder()
+                    .setName("HighSpin")
+                    .setKey("highspin_playback")
+                    .setBot(false)
+                    .setImportant(true)
+                    .build()
+
+                val shortcut = ShortcutInfoCompat.Builder(context, PLAYBACK_SHORTCUT_ID)
+                    .setShortLabel("Now Playing")
+                    .setLongLabel("HighSpin Playback")
+                    .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_vinyl))
+                    .setIntent(shortcutIntent)
+                    .setLongLived(true)
+                    .setPerson(person)
+                    .setCategories(setOf(NotificationCompat.CATEGORY_TRANSPORT, "com.lowspin.app.category.PLAYBACK"))
+                    .build()
+
+                ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+            }
+        }
+
+        /**
          * Creates Android 11+ Notification Bubble metadata targeting MainActivity.
-         * In Android 12+ (API 31+), bubbles require FLAG_MUTABLE so SystemUI can configure
-         * task launch flags.
+         * Ensures the dynamic shortcut is registered and sets FLAG_MUTABLE on Android 12+ (API 31+)
+         * so SystemUI can configure task launch flags.
          */
         fun createBubbleMetadata(context: Context): NotificationCompat.BubbleMetadata? {
+            publishPlaybackShortcut(context)
             return runCatching {
                 val bubbleIntent = Intent(context, MainActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
@@ -201,7 +251,7 @@ class HighSpinLiveNotificationProvider(
 
     /**
      * Enforces Android 15 & 16 Promoted Ongoing flags, Notification Bubble metadata, and
-     * OnePlus OxygenOS 15 Live Alerts / Fluid Cloud capsule integration on the built notification.
+     * OnePlus OxygenOS 15 Live Alerts / Fluid Cloud capsule integration.
      */
     private fun decorateNotification(
         mediaSession: MediaSession,
@@ -228,13 +278,16 @@ class HighSpinLiveNotificationProvider(
         // (Notification.hasPromotableCharacteristics) explicitly checks:
         //    if (!isOngoing()) return false;
         //    if (isGroupChild() && !isGroupSummary()) return false;
-        // We recover the Builder, clear grouping, set ongoing, configure channel & bubble metadata,
-        // and apply promoted ongoing.
+        //    if (isColorized()) return false;
+        // We recover the Builder, clear grouping, set ongoing, assign shortcut ID for bubbles,
+        // clear colorized, configure channel & bubble metadata, and apply promoted ongoing.
         val notification = runCatching {
             val builder = Notification.Builder.recoverBuilder(context, rawNotification)
             builder.setGroup(null)
             builder.setOngoing(shouldBeOngoing)
             builder.setChannelId(NOTIFICATION_CHANNEL_ID)
+            builder.setShortcutId(PLAYBACK_SHORTCUT_ID)
+            builder.setColorized(false)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
                 val platformBubble = NotificationCompat.BubbleMetadata.toPlatform(bubbleMetadata)
                 if (platformBubble != null) {
@@ -244,6 +297,8 @@ class HighSpinLiveNotificationProvider(
             applyPromotedOngoingViaReflection(builder, shouldBeOngoing)
             builder.build()
         }.getOrElse {
+            rawNotification.extras.remove("android.support.groupKey")
+            rawNotification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
             rawNotification
         }
 
@@ -310,9 +365,12 @@ class HighSpinLiveNotificationProvider(
             putString("album", album)
 
             putString("lyricInfo", lyricJson)
+            putString("lyric_info", lyricJson)
+            putString("oplus_lyric_info", lyricJson)
 
             putBoolean(Notification.EXTRA_SHOW_WHEN, shouldBeOngoing)
             putBoolean(EXTRA_SHOW_CHRONOMETER, shouldBeOngoing)
+            putBoolean(Notification.EXTRA_COLORIZED, false)
 
             if (isLiveEnabled) {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, shouldBeOngoing)
@@ -329,6 +387,21 @@ class HighSpinLiveNotificationProvider(
                 putString(EXTRA_CAPSULE_CONTENT, artist)
                 putBoolean(EXTRA_LIVE_NOTIFICATION, shouldBeOngoing)
                 putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, shouldBeOngoing)
+
+                // Fluid Cloud / Pantanal service compatibility
+                putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, true)
+                putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, true)
+                putString(EXTRA_OPLUS_PANTANAL_TYPE, "music")
+
+                // Icon and action for capsule
+                val sessionActivity = mediaSession.sessionActivity
+                if (sessionActivity != null) {
+                    putParcelable(EXTRA_CAPSULE_ACTION, sessionActivity)
+                    putParcelable(EXTRA_OPLUS_CAPSULE_ACTION, sessionActivity)
+                }
+                val capsuleIcon = Icon.createWithResource(context, R.drawable.ic_stat_vinyl)
+                putParcelable(EXTRA_CAPSULE_ICON, capsuleIcon)
+                putParcelable(EXTRA_OPLUS_CAPSULE_ICON, capsuleIcon)
             } else {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false)
                 putBoolean(EXTRA_OPLUS_ONGOING, false)
@@ -337,6 +410,8 @@ class HighSpinLiveNotificationProvider(
                 putInt(EXTRA_OPLUS_CAPSULE_STATUS, 0)
                 putBoolean(EXTRA_LIVE_NOTIFICATION, false)
                 putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, false)
+                putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, false)
+                putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, false)
             }
 
             // Real-time track progress
