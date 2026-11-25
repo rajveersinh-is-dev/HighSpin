@@ -14,12 +14,15 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v4",
+            "com.lowspin.app.playback.live.v5",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
             "com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v4")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v3")
@@ -29,6 +32,9 @@ class LiveNotificationTest {
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.media")
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_CATEGORIES.contains("android.shortcut.conversation")
         )
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
         assertEquals(
@@ -333,23 +339,24 @@ class LiveNotificationTest {
         val mock = MockNotificationWithFields()
         assertEquals("media3_group_key", mock.mGroupKey)
         assertNull(mock.mShortcutId)
+        assertEquals("old_channel", mock.mChannelId)
+        assertNull(mock.mBubbleMetadata)
 
-        // Clear group
-        val groupField = mock.javaClass.getDeclaredField("mGroupKey")
-        groupField.isAccessible = true
-        groupField.set(mock, null)
+        val mockBubble = "MockBubbleObject"
+        HighSpinLiveNotificationProvider.applyNotificationInternalOverrides(
+            target = mock,
+            channelId = HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID,
+            shortcutId = HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID,
+            bubbleMetadata = mockBubble,
+            clearGroup = true
+        )
+
         assertNull(mock.mGroupKey)
-
-        // Set shortcut ID
-        val shortcutField = mock.javaClass.getDeclaredField("mShortcutId")
-        shortcutField.isAccessible = true
-        shortcutField.set(mock, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
         assertEquals(HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID, mock.mShortcutId)
-
-        // Set channel ID
-        val channelField = mock.javaClass.getDeclaredField("mChannelId")
-        channelField.isAccessible = true
-        channelField.set(mock, HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID)
         assertEquals(HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID, mock.mChannelId)
+        assertEquals(mockBubble, mock.mBubbleMetadata)
+
+        // Verifies no crash on arbitrary objects lacking the reflection target
+        HighSpinLiveNotificationProvider.applyNotificationInternalOverrides("ArbitraryObject")
     }
 }

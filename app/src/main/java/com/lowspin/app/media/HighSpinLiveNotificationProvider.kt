@@ -57,12 +57,18 @@ class HighSpinLiveNotificationProvider(
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v4"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v5"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v4",
             "com.lowspin.app.playback.live.v3",
             "com.lowspin.app.playback.live",
             "com.lowspin.app.media"
+        )
+        val PLAYBACK_SHORTCUT_CATEGORIES = setOf(
+            NotificationCompat.CATEGORY_TRANSPORT,
+            "com.lowspin.app.category.PLAYBACK",
+            "android.shortcut.conversation"
         )
 
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
@@ -155,7 +161,7 @@ class HighSpinLiveNotificationProvider(
                     .setIntent(shortcutIntent)
                     .setLongLived(true)
                     .setPerson(person)
-                    .setCategories(setOf(NotificationCompat.CATEGORY_TRANSPORT, "com.lowspin.app.category.PLAYBACK"))
+                    .setCategories(PLAYBACK_SHORTCUT_CATEGORIES)
                     .build()
 
                 ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
@@ -165,13 +171,15 @@ class HighSpinLiveNotificationProvider(
         /**
          * Creates Android 11+ Notification Bubble metadata targeting MainActivity.
          * Ensures the dynamic shortcut is registered and sets FLAG_MUTABLE on Android 12+ (API 31+)
-         * so SystemUI can configure task launch flags.
+         * so SystemUI can configure task launch flags. Uses shortcutId constructor on Android 11+
+         * (API 30+) as required by BubbleController.
          */
         fun createBubbleMetadata(context: Context): NotificationCompat.BubbleMetadata? {
             publishPlaybackShortcut(context)
             return runCatching {
                 val bubbleIntent = Intent(context, MainActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
                 val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -185,11 +193,22 @@ class HighSpinLiveNotificationProvider(
                     pendingFlags
                 ) ?: return null
                 val icon = IconCompat.createWithResource(context, R.drawable.ic_stat_vinyl)
-                NotificationCompat.BubbleMetadata.Builder(pendingIntent, icon)
-                    .setDesiredHeight(600)
-                    .setAutoExpandBubble(false)
-                    .setSuppressNotification(false)
-                    .build()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    NotificationCompat.BubbleMetadata.Builder(PLAYBACK_SHORTCUT_ID)
+                        .setDesiredHeight(600)
+                        .setAutoExpandBubble(false)
+                        .setSuppressNotification(false)
+                        .setIcon(icon)
+                        .setIntent(pendingIntent)
+                        .build()
+                } else {
+                    NotificationCompat.BubbleMetadata.Builder(pendingIntent, icon)
+                        .setDesiredHeight(600)
+                        .setAutoExpandBubble(false)
+                        .setSuppressNotification(false)
+                        .build()
+                }
             }.getOrNull()
         }
 
@@ -205,6 +224,48 @@ class HighSpinLiveNotificationProvider(
                 val field = target.javaClass.getDeclaredField("mRequestPromotedOngoing")
                 field.isAccessible = true
                 field.set(target, isPromoted)
+            }
+        }
+
+        /**
+         * Directly overrides internal fields (mGroupKey, mShortcutId, mChannelId, mBubbleMetadata)
+         * via reflection to guarantee that Promoted Ongoing and Notification Bubble criteria are
+         * satisfied even when recoverBuilder is unavailable or falls back on OEM systems.
+         */
+        fun applyNotificationInternalOverrides(
+            target: Any,
+            channelId: String? = null,
+            shortcutId: String? = null,
+            bubbleMetadata: Any? = null,
+            clearGroup: Boolean = true
+        ) {
+            if (clearGroup) {
+                runCatching {
+                    val field = target.javaClass.getDeclaredField("mGroupKey")
+                    field.isAccessible = true
+                    field.set(target, null)
+                }
+            }
+            if (shortcutId != null) {
+                runCatching {
+                    val field = target.javaClass.getDeclaredField("mShortcutId")
+                    field.isAccessible = true
+                    field.set(target, shortcutId)
+                }
+            }
+            if (channelId != null) {
+                runCatching {
+                    val field = target.javaClass.getDeclaredField("mChannelId")
+                    field.isAccessible = true
+                    field.set(target, channelId)
+                }
+            }
+            if (bubbleMetadata != null) {
+                runCatching {
+                    val field = target.javaClass.getDeclaredField("mBubbleMetadata")
+                    field.isAccessible = true
+                    field.set(target, bubbleMetadata)
+                }
             }
         }
     }
@@ -272,6 +333,9 @@ class HighSpinLiveNotificationProvider(
 
         val rawNotification = mediaNotification.notification
         val bubbleMetadata = if (isLiveEnabled) createBubbleMetadata(context) else null
+        val platformBubble = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
+            NotificationCompat.BubbleMetadata.toPlatform(bubbleMetadata)
+        } else null
 
         // DefaultMediaNotificationProvider hardcodes setOngoing(false) and groups children
         // with "media3_group_key" right before build(). Android 15 Promoted Ongoing
@@ -288,11 +352,8 @@ class HighSpinLiveNotificationProvider(
             builder.setChannelId(NOTIFICATION_CHANNEL_ID)
             builder.setShortcutId(PLAYBACK_SHORTCUT_ID)
             builder.setColorized(false)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
-                val platformBubble = NotificationCompat.BubbleMetadata.toPlatform(bubbleMetadata)
-                if (platformBubble != null) {
-                    builder.setBubbleMetadata(platformBubble)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
+                builder.setBubbleMetadata(platformBubble)
             }
             applyPromotedOngoingViaReflection(builder, shouldBeOngoing)
             builder.build()
@@ -301,6 +362,15 @@ class HighSpinLiveNotificationProvider(
             rawNotification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
             rawNotification
         }
+
+        // Guaranteed override of internal fields to satisfy promotable and bubble constraints
+        applyNotificationInternalOverrides(
+            target = notification,
+            channelId = NOTIFICATION_CHANNEL_ID,
+            shortcutId = PLAYBACK_SHORTCUT_ID,
+            bubbleMetadata = platformBubble,
+            clearGroup = true
+        )
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
         var flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
