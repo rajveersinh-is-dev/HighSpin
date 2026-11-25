@@ -41,7 +41,6 @@
             android:exported="true"
             android:allowEmbedded="true"
             android:resizeableActivity="true"
-            android:documentLaunchMode="always"
             android:launchMode="singleTask"
             android:theme="@style/Theme.Lowspin.Splash">
             <intent-filter>

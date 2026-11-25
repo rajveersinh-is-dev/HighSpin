@@ -150,6 +150,23 @@ class PlaybackService : MediaSessionService() {
             }
         }
         manager.createNotificationChannel(channel)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val conversationChannel = NotificationChannel(
+                "${NOTIFICATION_CHANNEL_ID}_${HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID}",
+                "Now Playing",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "HighSpin playback bubble conversation"
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+                enableVibration(false)
+                setSound(null, null)
+                setAllowBubbles(true)
+                setConversationId(NOTIFICATION_CHANNEL_ID, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
+            }
+            manager.createNotificationChannel(conversationChannel)
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

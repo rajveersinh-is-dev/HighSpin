@@ -14,12 +14,15 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v5",
+            "com.lowspin.app.playback.live.v6",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
             "com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v5")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v4")
@@ -358,5 +361,52 @@ class LiveNotificationTest {
 
         // Verifies no crash on arbitrary objects lacking the reflection target
         HighSpinLiveNotificationProvider.applyNotificationInternalOverrides("ArbitraryObject")
+    }
+
+    @Test
+    fun liveNotification_internalFieldsReflection_resolvesOnSubclass() {
+        open class SuperNotification {
+            @JvmField
+            var mGroupKey: String? = "media3_group_key"
+            @JvmField
+            var mShortcutId: String? = null
+            @JvmField
+            var mChannelId: String? = "old_channel"
+            @JvmField
+            var mBubbleMetadata: Any? = null
+        }
+
+        class SubclassNotification : SuperNotification()
+
+        val sub = SubclassNotification()
+        HighSpinLiveNotificationProvider.applyNotificationInternalOverrides(
+            target = sub,
+            channelId = HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID,
+            shortcutId = HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID,
+            bubbleMetadata = "SubBubble",
+            clearGroup = true
+        )
+
+        assertNull(sub.mGroupKey)
+        assertEquals(HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID, sub.mShortcutId)
+        assertEquals(HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID, sub.mChannelId)
+        assertEquals("SubBubble", sub.mBubbleMetadata)
+    }
+
+    @Test
+    fun liveNotification_findDeclaredField_searchesRecursively() {
+        open class GrandParent {
+            @JvmField
+            var mGrandField: String = "found"
+        }
+        open class Parent : GrandParent()
+        class Child : Parent()
+
+        val field = HighSpinLiveNotificationProvider.findDeclaredField(Child::class.java, "mGrandField")
+        assertTrue(field != null)
+        assertEquals("mGrandField", field!!.name)
+
+        val nonExistent = HighSpinLiveNotificationProvider.findDeclaredField(Child::class.java, "mDoesNotExist")
+        assertNull(nonExistent)
     }
 }

@@ -57,9 +57,10 @@ class HighSpinLiveNotificationProvider(
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v5"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v6"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v5",
             "com.lowspin.app.playback.live.v4",
             "com.lowspin.app.playback.live.v3",
             "com.lowspin.app.playback.live",
@@ -228,9 +229,24 @@ class HighSpinLiveNotificationProvider(
         }
 
         /**
+         * Resolves a declared field across the class hierarchy, supporting proxy/subclass objects.
+         */
+        fun findDeclaredField(clazz: Class<*>, fieldName: String): java.lang.reflect.Field? {
+            var current: Class<*>? = clazz
+            while (current != null && current != Any::class.java) {
+                try {
+                    return current.getDeclaredField(fieldName)
+                } catch (_: NoSuchFieldException) {
+                    current = current.superclass
+                }
+            }
+            return null
+        }
+
+        /**
          * Directly overrides internal fields (mGroupKey, mShortcutId, mChannelId, mBubbleMetadata)
          * via reflection to guarantee that Promoted Ongoing and Notification Bubble criteria are
-         * satisfied even when recoverBuilder is unavailable or falls back on OEM systems.
+         * satisfied even when builder recovery is unavailable or falls back on OEM systems.
          */
         fun applyNotificationInternalOverrides(
             target: Any,
@@ -241,30 +257,34 @@ class HighSpinLiveNotificationProvider(
         ) {
             if (clearGroup) {
                 runCatching {
-                    val field = target.javaClass.getDeclaredField("mGroupKey")
-                    field.isAccessible = true
-                    field.set(target, null)
+                    findDeclaredField(target.javaClass, "mGroupKey")?.let { field ->
+                        field.isAccessible = true
+                        field.set(target, null)
+                    }
                 }
             }
             if (shortcutId != null) {
                 runCatching {
-                    val field = target.javaClass.getDeclaredField("mShortcutId")
-                    field.isAccessible = true
-                    field.set(target, shortcutId)
+                    findDeclaredField(target.javaClass, "mShortcutId")?.let { field ->
+                        field.isAccessible = true
+                        field.set(target, shortcutId)
+                    }
                 }
             }
             if (channelId != null) {
                 runCatching {
-                    val field = target.javaClass.getDeclaredField("mChannelId")
-                    field.isAccessible = true
-                    field.set(target, channelId)
+                    findDeclaredField(target.javaClass, "mChannelId")?.let { field ->
+                        field.isAccessible = true
+                        field.set(target, channelId)
+                    }
                 }
             }
             if (bubbleMetadata != null) {
                 runCatching {
-                    val field = target.javaClass.getDeclaredField("mBubbleMetadata")
-                    field.isAccessible = true
-                    field.set(target, bubbleMetadata)
+                    findDeclaredField(target.javaClass, "mBubbleMetadata")?.let { field ->
+                        field.isAccessible = true
+                        field.set(target, bubbleMetadata)
+                    }
                 }
             }
         }
@@ -337,30 +357,89 @@ class HighSpinLiveNotificationProvider(
             NotificationCompat.BubbleMetadata.toPlatform(bubbleMetadata)
         } else null
 
+        val currentMediaItem = player.currentMediaItem
+        val songId = currentMediaItem?.mediaId?.toLongOrNull()
+        var artBitmap = songId?.let { loadCachedArtBitmapSafe(it) }
+        @Suppress("DEPRECATION")
+        if (artBitmap == null && rawNotification.largeIcon != null) {
+            artBitmap = rawNotification.largeIcon
+        }
+
         // DefaultMediaNotificationProvider hardcodes setOngoing(false) and groups children
         // with "media3_group_key" right before build(). Android 15 Promoted Ongoing
         // (Notification.hasPromotableCharacteristics) explicitly checks:
         //    if (!isOngoing()) return false;
         //    if (isGroupChild() && !isGroupSummary()) return false;
-        //    if (isColorized()) return false;
-        // We recover the Builder, clear grouping, set ongoing, assign shortcut ID for bubbles,
-        // clear colorized, configure channel & bubble metadata, and apply promoted ongoing.
+        // We use NotificationCompat.Builder(context, rawNotification) to rebuild cleanly without
+        // relying on fragile platform recoverBuilder (which throws ClassNotFoundException on
+        // AndroidX MediaStyle templates). This sets ongoing, clears groupKey, assigns shortcut ID
+        // for bubbles, binds BubbleMetadata, and applies promoted ongoing flags cleanly.
         val notification = runCatching {
-            val builder = Notification.Builder.recoverBuilder(context, rawNotification)
-            builder.setGroup(null)
-            builder.setOngoing(shouldBeOngoing)
-            builder.setChannelId(NOTIFICATION_CHANNEL_ID)
-            builder.setShortcutId(PLAYBACK_SHORTCUT_ID)
-            builder.setColorized(false)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
-                builder.setBubbleMetadata(platformBubble)
+            val compatBuilder = NotificationCompat.Builder(context, rawNotification)
+                .setChannelId(NOTIFICATION_CHANNEL_ID)
+                .setOngoing(shouldBeOngoing)
+                .setGroup(null)
+                .setShortcutId(PLAYBACK_SHORTCUT_ID)
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setShowWhen(shouldBeOngoing)
+
+            if (shouldBeOngoing && position >= 0L) {
+                compatBuilder.setWhen(System.currentTimeMillis() - position)
+            } else {
+                compatBuilder.setWhen(System.currentTimeMillis())
             }
-            applyPromotedOngoingViaReflection(builder, shouldBeOngoing)
-            builder.build()
+
+            if (shouldBeOngoing) {
+                compatBuilder.setTicker(formatTicker(title, artist))
+            } else {
+                compatBuilder.setTicker(null)
+            }
+
+            if (artBitmap != null) {
+                compatBuilder.setLargeIcon(artBitmap)
+            }
+
+            if (isLiveEnabled && bubbleMetadata != null) {
+                compatBuilder.setBubbleMetadata(bubbleMetadata)
+            }
+
+            val built = compatBuilder.build()
+            applyPromotedOngoingViaReflection(built, shouldBeOngoing)
+            built
         }.getOrElse {
-            rawNotification.extras.remove("android.support.groupKey")
-            rawNotification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
+            rawNotification.flags = computeOngoingFlags(rawNotification.flags, shouldBeOngoing)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
+                rawNotification.flags = rawNotification.flags or Notification.FLAG_BUBBLE
+            }
+            rawNotification.category = Notification.CATEGORY_TRANSPORT
+            rawNotification.visibility = Notification.VISIBILITY_PUBLIC
+            @Suppress("DEPRECATION")
+            rawNotification.priority = Notification.PRIORITY_HIGH
+            if (shouldBeOngoing) {
+                rawNotification.tickerText = formatTicker(title, artist)
+            } else {
+                rawNotification.tickerText = null
+            }
+            if (shouldBeOngoing && position >= 0L) {
+                rawNotification.`when` = System.currentTimeMillis() - position
+            } else {
+                rawNotification.`when` = System.currentTimeMillis()
+            }
+            if (artBitmap != null) {
+                @Suppress("DEPRECATION")
+                rawNotification.largeIcon = artBitmap
+            }
+            applyPromotedOngoingViaReflection(rawNotification, shouldBeOngoing)
             rawNotification
+        }
+
+        // Unconditionally remove media3 groupKey and assign shortcut & bubble metadata extras
+        notification.extras.remove("android.support.groupKey")
+        notification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
+            notification.extras.putParcelable("android.support.bubbleMetadata", platformBubble)
         }
 
         // Guaranteed override of internal fields to satisfy promotable and bubble constraints
@@ -393,8 +472,6 @@ class HighSpinLiveNotificationProvider(
         }
 
         // 4. Live Chronometer Ticking for status bar pill & lockscreen cards
-        // Media3 calls setShowWhen(false), which suppresses chronometers. Restoring android.showWhen
-        // ensures Android 15 and OxygenOS 15 Live Alerts render live progress.
         if (shouldBeOngoing && position >= 0L) {
             notification.`when` = System.currentTimeMillis() - position
         } else {
@@ -402,13 +479,6 @@ class HighSpinLiveNotificationProvider(
         }
 
         // 5. Safe Album Art Bitmap for large icon if present
-        val currentMediaItem = player.currentMediaItem
-        val songId = currentMediaItem?.mediaId?.toLongOrNull()
-        var artBitmap = songId?.let { loadCachedArtBitmapSafe(it) }
-        @Suppress("DEPRECATION")
-        if (artBitmap == null && notification.largeIcon != null) {
-            artBitmap = notification.largeIcon
-        }
         if (artBitmap != null) {
             @Suppress("DEPRECATION")
             notification.largeIcon = artBitmap
@@ -440,7 +510,6 @@ class HighSpinLiveNotificationProvider(
 
             putBoolean(Notification.EXTRA_SHOW_WHEN, shouldBeOngoing)
             putBoolean(EXTRA_SHOW_CHRONOMETER, shouldBeOngoing)
-            putBoolean(Notification.EXTRA_COLORIZED, false)
 
             if (isLiveEnabled) {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, shouldBeOngoing)

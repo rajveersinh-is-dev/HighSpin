@@ -10,8 +10,8 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 Grab the ready-to-install APK directly from GitHub Releases:
 
-- **[Download HighSpin Release APK (v2.3.5)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.88 MB - Ultra lightweight, R8 minified & resource-shrunk)
-- **[Download HighSpin Debug APK (v2.3.5)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+- **[Download HighSpin Release APK (v2.3.6)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.88 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.3.6)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
 
 ---
 
