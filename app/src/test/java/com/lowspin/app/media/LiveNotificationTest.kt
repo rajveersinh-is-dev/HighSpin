@@ -150,6 +150,24 @@ class LiveNotificationTest {
         val withLyrics = buildLyricInfoJson(song, "[00:12.34]I'm trying to put you in the worst mood")
         assertTrue(withLyrics.contains(""""noLyric":false"""))
         assertTrue(withLyrics.contains(""""lyric":"[00:12.34]I'm trying to put you in the worst mood""""))
+
+        // Direct overload with complex special characters: quotes, backslashes, tabs, newlines
+        val rawJson = buildLyricInfoJson(
+            title = "A \"Title\" with \\backslash\\ and \nnewlines",
+            artist = "AC/DC \"Live\"",
+            album = "Back in Black\\Album",
+            songId = 99L
+        )
+        assertTrue(rawJson.contains(""""songName":"A \"Title\" with \\backslash\\ and \nnewlines"""".replace("\n", "\\n")))
+        assertTrue(rawJson.contains(""""artist":"AC/DC \"Live\"""""))
+        assertTrue(rawJson.contains(""""album":"Back in Black\\Album""""))
+        assertTrue(rawJson.contains(""""songId":"99""""))
+        assertTrue(rawJson.contains(""""noLyric":true"""))
+
+        // Direct escapeJson verification
+        assertEquals("""Hello \"World\"""", escapeJson("""Hello "World""""))
+        assertEquals("""Back\\Slash""", escapeJson("""Back\Slash"""))
+        assertEquals("Line1\\nLine2\\rTab\\t", escapeJson("Line1\nLine2\rTab\t"))
     }
 
     @Test

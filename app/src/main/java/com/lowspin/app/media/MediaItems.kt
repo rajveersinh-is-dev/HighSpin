@@ -25,22 +25,43 @@ private fun mimeTypeFor(song: SongEntity): String? {
 }
 
 /**
+ * Escapes characters for safe JSON serialization.
+ */
+fun escapeJson(s: String): String =
+    s.replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+        .replace("\b", "\\b")
+        .replace("\u000c", "\\f")
+
+/**
  * Builds standard lyricInfo JSON recognized natively by OnePlus / ColorOS lock screen Live Space
  * and dynamic island capsules. Supports both synchronized LRC text and no-lyric fallback states.
  */
-fun buildLyricInfoJson(song: SongEntity, lrcContent: String? = null): String {
-    fun escapeJson(s: String): String =
-        s.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-
+fun buildLyricInfoJson(
+    title: String,
+    artist: String,
+    album: String,
+    songId: Long,
+    lrcContent: String? = null
+): String {
     return if (!lrcContent.isNullOrBlank()) {
-        """{"songName":"${escapeJson(song.title)}","artist":"${escapeJson(song.artist)}","album":"${escapeJson(song.album)}","songId":"${song.id}","lyric":"${escapeJson(lrcContent)}","noLyric":false}"""
+        """{"songName":"${escapeJson(title)}","artist":"${escapeJson(artist)}","album":"${escapeJson(album)}","songId":"$songId","lyric":"${escapeJson(lrcContent)}","noLyric":false}"""
     } else {
-        """{"songName":"${escapeJson(song.title)}","artist":"${escapeJson(song.artist)}","album":"${escapeJson(song.album)}","songId":"${song.id}","noLyric":true}"""
+        """{"songName":"${escapeJson(title)}","artist":"${escapeJson(artist)}","album":"${escapeJson(album)}","songId":"$songId","noLyric":true}"""
     }
+}
+
+fun buildLyricInfoJson(song: SongEntity, lrcContent: String? = null): String {
+    return buildLyricInfoJson(
+        title = song.title,
+        artist = song.artist,
+        album = song.album,
+        songId = song.id,
+        lrcContent = lrcContent
+    )
 }
 
 fun SongEntity.toMediaItem(): MediaItem {

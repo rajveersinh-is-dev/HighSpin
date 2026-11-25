@@ -173,10 +173,10 @@ class HighSpinLiveNotificationProvider(
         notification.flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
 
         // 2. High priority transport category & public lockscreen visibility
-        notification.category = NotificationCompat.CATEGORY_TRANSPORT
-        notification.visibility = NotificationCompat.VISIBILITY_PUBLIC
+        notification.category = Notification.CATEGORY_TRANSPORT
+        notification.visibility = Notification.VISIBILITY_PUBLIC
         @Suppress("DEPRECATION")
-        notification.priority = NotificationCompat.PRIORITY_DEFAULT
+        notification.priority = Notification.PRIORITY_DEFAULT
 
         // 3. Status-bar live ticker text
         if (shouldBeOngoing) {
@@ -215,7 +215,7 @@ class HighSpinLiveNotificationProvider(
 
         // 6. Complete Android 15 Promoted Ongoing (Live Updates) & OnePlus OxygenOS 15 Live Alerts extras
         val lyricJson = metadata.extras?.getString("lyricInfo")
-            ?: songId?.let { id -> """{"songName":"$title","artist":"$artist","album":"$album","songId":"$id","noLyric":true}""" }
+            ?: songId?.let { id -> buildLyricInfoJson(title, artist, album, id) }
 
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
