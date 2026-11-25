@@ -1,5 +1,6 @@
 *.apk
 *.aab
+release-artifacts/
 build/
 app/build/
 .gradle/

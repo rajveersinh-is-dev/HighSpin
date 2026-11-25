@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -59,6 +60,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.di.AppContainer
 import com.lowspin.app.media.PlaybackService
+import com.lowspin.app.ui.settings.HighSpinThemes
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LowspinAccentShades
 import com.lowspin.app.ui.theme.LowspinBackground
@@ -80,6 +82,10 @@ fun SettingsScreen(
     val appearance = LocalAppearance.current
     var refresh by remember { mutableStateOf(0) }
 
+    val themeIndex by appearance.themeIndex.collectAsStateWithLifecycle()
+    val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
+    val visualizerEnabled by appearance.visualizerEnabled.collectAsStateWithLifecycle()
+    val visualizerStyle by appearance.visualizerStyle.collectAsStateWithLifecycle()
     val accentIndex by appearance.accentIndex.collectAsStateWithLifecycle()
     val textScale by appearance.textScale.collectAsStateWithLifecycle()
     val compact by appearance.compact.collectAsStateWithLifecycle()
@@ -145,43 +151,75 @@ fun SettingsScreen(
 
             SettingCard {
                 Text(
-                    text = "Accent",
+                    text = "Aesthetic Color Theme",
                     style = MaterialTheme.typography.titleSmall,
                     color = LowspinTextPrimary
                 )
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
-                    LowspinAccentShades.forEachIndexed { index, color ->
-                        Box(
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                ) {
+                    HighSpinThemes.forEachIndexed { index, theme ->
+                        val selected = themeIndex == index
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(color)
-                                .clickable { appearance.setAccent(index) }
-                                .padding(if (accentIndex == index) 4.dp else 0.dp)
-                                .then(
-                                    if (accentIndex == index) {
-                                        Modifier.background(
-                                            LowspinTextPrimary,
-                                            RoundedCornerShape(18.dp)
-                                        )
-                                    } else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (accentIndex == index) {
-                                Box(
-                                    Modifier
-                                        .size(28.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(color)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { appearance.setTheme(index) }
+                                .background(
+                                    if (selected) LowspinSurfaceHigh else androidx.compose.ui.graphics.Color.Transparent
                                 )
+                                .padding(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(theme.primary)
+                                    .padding(if (selected) 3.dp else 0.dp)
+                                    .then(
+                                        if (selected) {
+                                            Modifier.background(
+                                                LowspinTextPrimary,
+                                                RoundedCornerShape(18.dp)
+                                            )
+                                        } else Modifier
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (selected) {
+                                    Box(
+                                        Modifier
+                                            .size(30.dp)
+                                            .clip(RoundedCornerShape(15.dp))
+                                            .background(theme.primary)
+                                    )
+                                }
                             }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = theme.name.substringBefore(" "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
+                ToggleRow("Pure Black (AMOLED OLED)", pureBlack, appearance::setPureBlack)
+                ToggleRow("Audio Visualizer", visualizerEnabled, appearance::setVisualizerEnabled)
+                if (visualizerEnabled) {
+                    ChoiceRow(
+                        title = "Visualizer Animation Style",
+                        options = listOf("Equalizer Bars" to 0f, "Neon Wave" to 1f, "Pulse Dots" to 2f),
+                        selected = visualizerStyle.toFloat(),
+                        onSelect = { appearance.setVisualizerStyle(it.toInt()) }
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
                 ChoiceRow(
                     title = "Text size",
                     options = listOf("Small" to 0.9f, "Default" to 1f, "Large" to 1.15f),

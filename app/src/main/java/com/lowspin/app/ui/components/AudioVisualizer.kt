@@ -1,0 +1,270 @@
+package com.lowspin.app.ui.components
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * High-performance, hardware-accelerated animated audio visualizer.
+ * Supports 3 styles:
+ * - 0: Dynamic Equalizer Spectrum Bars with floating peak caps
+ * - 1: Glowing Multi-Harmonic Neon Waves
+ * - 2: Minimalist Dancing Rhythm Dots
+ */
+@Composable
+fun AudioVisualizer(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    barCount: Int = 26,
+    style: Int = 0,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+    height: Dp = 48.dp
+) {
+    val playFactor by animateFloatAsState(
+        targetValue = if (isPlaying) 1f else 0.08f,
+        animationSpec = tween(durationMillis = 400),
+        label = "playFactor"
+    )
+
+    val transition = rememberInfiniteTransition(label = "visualizerPhase")
+    val phase1 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase1"
+    )
+    val phase2 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase2"
+    )
+
+    // Precalculated frequency multipliers to give realistic equalizer spectrum shaping
+    // (higher bass on left, dynamic mids, taper at high frequencies)
+    val spectrumShape = remember(barCount) {
+        FloatArray(barCount) { i ->
+            val norm = i.toFloat() / (barCount - 1).coerceAtLeast(1)
+            // Bass bump around 0.15 - 0.35, gentle treble slope
+            0.65f + 0.35f * sin((norm * PI).toFloat())
+        }
+    }
+
+    val primary = accentColor
+    val secondary = MaterialTheme.colorScheme.secondary
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+    ) {
+        val width = size.width
+        val canvasHeight = size.height
+
+        when (style) {
+            1 -> {
+                // Style 1: Glowing Neon Waves
+                drawNeonWaves(
+                    width = width,
+                    canvasHeight = canvasHeight,
+                    playFactor = playFactor,
+                    phase1 = phase1,
+                    phase2 = phase2,
+                    primary = primary,
+                    secondary = secondary
+                )
+            }
+            2 -> {
+                // Style 2: Rhythm Dots
+                drawPulseDots(
+                    width = width,
+                    canvasHeight = canvasHeight,
+                    barCount = barCount,
+                    playFactor = playFactor,
+                    phase1 = phase1,
+                    spectrumShape = spectrumShape,
+                    primary = primary
+                )
+            }
+            else -> {
+                // Style 0 (Default): Spectrum Equalizer Bars
+                drawSpectrumBars(
+                    width = width,
+                    canvasHeight = canvasHeight,
+                    barCount = barCount,
+                    playFactor = playFactor,
+                    phase1 = phase1,
+                    phase2 = phase2,
+                    spectrumShape = spectrumShape,
+                    primary = primary,
+                    secondary = secondary
+                )
+            }
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSpectrumBars(
+    width: Float,
+    canvasHeight: Float,
+    barCount: Int,
+    playFactor: Float,
+    phase1: Float,
+    phase2: Float,
+    spectrumShape: FloatArray,
+    primary: Color,
+    secondary: Color
+) {
+    val totalGaps = (barCount - 1).coerceAtLeast(1)
+    val gapWidth = (width / barCount) * 0.28f
+    val barWidth = ((width - (totalGaps * gapWidth)) / barCount).coerceAtLeast(2f)
+    val corner = CornerRadius(barWidth / 2f, barWidth / 2f)
+
+    for (i in 0 until barCount) {
+        val shape = spectrumShape[i]
+        val harmonic = abs(
+            0.5f * sin(phase1 + i * 0.42f) +
+                0.35f * cos(phase2 + i * 0.65f) +
+                0.25f * sin(phase1 * 1.5f + i * 0.28f)
+        ).coerceIn(0.08f, 1f)
+
+        val heightFraction = (harmonic * shape * playFactor).coerceIn(0.05f, 1f)
+        val barH = canvasHeight * heightFraction * 0.92f
+        val left = i * (barWidth + gapWidth)
+        val top = canvasHeight - barH
+
+        // Draw bar
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(primary, secondary.copy(alpha = 0.85f)),
+                startY = top,
+                endY = canvasHeight
+            ),
+            topLeft = Offset(left, top),
+            size = Size(barWidth, barH),
+            cornerRadius = corner
+        )
+
+        // Draw peak cap if playing
+        if (playFactor > 0.4f) {
+            val peakTop = (top - 4.dp.toPx()).coerceAtLeast(0f)
+            drawLine(
+                color = primary.copy(alpha = 0.9f),
+                start = Offset(left, peakTop),
+                end = Offset(left + barWidth, peakTop),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNeonWaves(
+    width: Float,
+    canvasHeight: Float,
+    playFactor: Float,
+    phase1: Float,
+    phase2: Float,
+    primary: Color,
+    secondary: Color
+) {
+    val centerY = canvasHeight / 2f
+    val amplitude = (canvasHeight * 0.42f) * playFactor
+
+    val path1 = Path()
+    val path2 = Path()
+
+    val steps = 40
+    val stepX = width / steps
+
+    for (step in 0..steps) {
+        val x = step * stepX
+        val norm = step.toFloat() / steps
+        val envelope = sin((norm * PI).toFloat())
+
+        val y1 = centerY + sin(phase1 + norm * 3.5f * PI.toFloat()) * amplitude * envelope
+        val y2 = centerY + cos(phase2 + norm * 2.8f * PI.toFloat()) * amplitude * 0.75f * envelope
+
+        if (step == 0) {
+            path1.moveTo(x, y1)
+            path2.moveTo(x, y2)
+        } else {
+            path1.lineTo(x, y1)
+            path2.lineTo(x, y2)
+        }
+    }
+
+    // Secondary subtle wave
+    drawPath(
+        path = path2,
+        color = secondary.copy(alpha = 0.45f),
+        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+    )
+
+    // Primary glowing wave
+    drawPath(
+        path = path1,
+        color = primary,
+        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPulseDots(
+    width: Float,
+    canvasHeight: Float,
+    barCount: Int,
+    playFactor: Float,
+    phase1: Float,
+    spectrumShape: FloatArray,
+    primary: Color
+) {
+    val stepX = width / barCount.coerceAtLeast(1)
+    val centerY = canvasHeight / 2f
+    val maxRadius = (stepX * 0.35f).coerceIn(3.dp.toPx(), 8.dp.toPx())
+
+    for (i in 0 until barCount) {
+        val shape = spectrumShape[i]
+        val offsetFactor = sin(phase1 + i * 0.5f) * playFactor
+        val cx = i * stepX + stepX / 2f
+        val cy = centerY + offsetFactor * (canvasHeight * 0.35f) * shape
+        val r = (maxRadius * (0.4f + 0.6f * abs(offsetFactor))).coerceAtLeast(2.dp.toPx())
+
+        drawCircle(
+            color = primary.copy(alpha = (0.35f + 0.65f * abs(offsetFactor)).coerceIn(0.2f, 1f)),
+            radius = r,
+            center = Offset(cx, cy)
+        )
+    }
+}

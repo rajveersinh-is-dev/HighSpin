@@ -8,42 +8,54 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lowspin.app.ui.settings.HighSpinThemes
 import com.lowspin.app.ui.settings.LocalAppearance
-import com.lowspin.app.ui.settings.LowspinAccentShades
 
 @Composable
 fun LowspinTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
-    val accentIndex by appearance.accentIndex.collectAsStateWithLifecycle()
+    val themeIndex by appearance.themeIndex.collectAsStateWithLifecycle()
+    val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
     val highContrast by appearance.highContrast.collectAsStateWithLifecycle()
 
-    val colorScheme = remember(accentIndex, highContrast) {
-        val accent = LowspinAccentShades[accentIndex.coerceIn(0, LowspinAccentShades.lastIndex)]
+    val colorScheme = remember(themeIndex, pureBlack, highContrast) {
+        val preset = HighSpinThemes[themeIndex.coerceIn(0, HighSpinThemes.lastIndex)]
+        val primary = preset.primary
+        val secondary = preset.secondary
+
+        val bg = if (pureBlack) Color(0xFF000000) else preset.background
+        val surface = if (pureBlack) Color(0xFF0C0C0E) else preset.surface
+        val surfaceHigh = if (pureBlack) Color(0xFF18181C) else Color(
+            red = (preset.surface.red * 1.35f).coerceAtMost(1f),
+            green = (preset.surface.green * 1.35f).coerceAtMost(1f),
+            blue = (preset.surface.blue * 1.35f).coerceAtMost(1f)
+        )
+
         darkColorScheme(
-            primary = accent,
+            primary = primary,
             onPrimary = LowspinOnAccent,
-            primaryContainer = LowspinAccentPressed,
+            primaryContainer = secondary,
             onPrimaryContainer = LowspinTextPrimary,
-            secondary = LowspinAccentPressed,
+            secondary = secondary,
             onSecondary = LowspinOnAccent,
-            background = LowspinBackground,
+            background = bg,
             onBackground = LowspinTextPrimary,
-            surface = LowspinSurface,
+            surface = surface,
             onSurface = LowspinTextPrimary,
-            surfaceVariant = LowspinSurfaceHigh,
+            surfaceVariant = surfaceHigh,
             onSurfaceVariant = if (highContrast) {
-                Color(0xFFD6D6DF)
+                Color(0xFFE0E0EC)
             } else {
                 LowspinTextSecondary
             },
-            surfaceContainer = LowspinSurface,
-            surfaceContainerHigh = LowspinSurfaceHigh,
-            surfaceContainerHighest = LowspinSurfaceHigh,
+            surfaceContainer = surface,
+            surfaceContainerHigh = surfaceHigh,
+            surfaceContainerHighest = surfaceHigh,
             error = LowspinError,
-            onError = LowspinBackground,
-            outline = LowspinSurfaceHigh,
-            outlineVariant = LowspinSurfaceHigh
+            onError = bg,
+            outline = surfaceHigh,
+            outlineVariant = surfaceHigh
         )
     }
 

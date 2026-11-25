@@ -1,14 +1,11 @@
 package com.lowspin.app.ui.screens.nowplaying
 
-import com.lowspin.app.ui.theme.LowspinOnAccent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,24 +21,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,11 +56,11 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,16 +70,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.data.lyrics.Lyrics
 import com.lowspin.app.media.PlayerUiState
 import com.lowspin.app.ui.components.AlbumArtImage
+import com.lowspin.app.ui.components.AudioVisualizer
+import com.lowspin.app.ui.components.TurntableVinyl
+import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.theme.LowspinBackground
+import com.lowspin.app.ui.theme.LowspinOnAccent
+import com.lowspin.app.ui.theme.LowspinSurfaceElevated
 import com.lowspin.app.ui.theme.LowspinSurfaceHigh
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
@@ -101,9 +112,16 @@ fun NowPlayingScreen(
     onSleepClick: () -> Unit,
     onSpeedClick: () -> Unit = {},
     onEqualizerClick: () -> Unit = {},
-    onQueueClick: () -> Unit = {}
+    onQueueClick: () -> Unit = {},
+    onSongInfoClick: () -> Unit = {}
 ) {
     val song = state.currentSong ?: return
+    val appearance = LocalAppearance.current
+    val visualizerEnabled by appearance.visualizerEnabled.collectAsStateWithLifecycle()
+    val visualizerStyle by appearance.visualizerStyle.collectAsStateWithLifecycle()
+    val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
+
+    var turntableMode by rememberSaveable { mutableStateOf(false) }
 
     val dominant = remember(state.dominantColor, song.id) {
         state.dominantColor
@@ -111,15 +129,23 @@ fun NowPlayingScreen(
             ?.let { Color(it) }
             ?: Color(GradientPlaceholder.primaryColor(song.album.ifBlank { song.title }))
     }
-    val top = remember(dominant) { lerp(dominant, LowspinBackground, 0.20f) }
-    val middle = remember(dominant) { lerp(dominant, LowspinBackground, 0.70f) }
+
+    val baseBg = if (pureBlack) Color(0xFF000000) else LowspinBackground
+    val top = remember(dominant, pureBlack) {
+        if (pureBlack) lerp(dominant, Color(0xFF000000), 0.65f)
+        else lerp(dominant, baseBg, 0.20f)
+    }
+    val middle = remember(dominant, pureBlack) {
+        if (pureBlack) lerp(dominant, Color(0xFF000000), 0.88f)
+        else lerp(dominant, baseBg, 0.70f)
+    }
 
     var dragOffset by remember { mutableFloatStateOf(0f) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(top, middle, LowspinBackground)))
+            .background(Brush.verticalGradient(listOf(top, middle, baseBg)))
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {
@@ -141,6 +167,7 @@ fun NowPlayingScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
         ) {
+            // Top Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -172,6 +199,16 @@ fun NowPlayingScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // Turntable Vinyl toggle button
+                IconButton(onClick = { turntableMode = !turntableMode }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Album,
+                        contentDescription = if (turntableMode) "Switch to Album Art" else "Switch to Turntable Vinyl",
+                        tint = if (turntableMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 IconButton(onClick = onToggleLike) {
                     Icon(
                         imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
@@ -196,6 +233,7 @@ fun NowPlayingScreen(
                 }
             }
 
+            // Center Artwork / Vinyl / Lyrics
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -204,79 +242,134 @@ fun NowPlayingScreen(
             ) {
                 if (showLyrics && lyrics != null) {
                     LyricsCard(
-                        lyrics = lyrics!!,
+                        lyrics = lyrics,
                         positionMs = state.positionMs,
-                        isPlaying = state.isPlaying
+                        isPlaying = state.isPlaying,
+                        onSeek = onSeek
+                    )
+                } else if (turntableMode) {
+                    TurntableVinyl(
+                        songId = song.id,
+                        albumSeed = song.album.ifBlank { song.title },
+                        isPlaying = state.isPlaying,
+                        dominantColor = dominant,
+                        modifier = Modifier.fillMaxSize(0.95f)
                     )
                 } else {
                     BoxWithConstraints {
-                        val side = minOf(maxWidth, maxHeight)
-                        AlbumArtImage(
-                            songId = song.id,
-                            seed = song.album.ifBlank { song.title },
-                            modifier = Modifier.size(side),
-                            sizePx = 800,
-                            shape = RoundedCornerShape(8.dp),
-                            showRotatingVinyl = true,
-                            isPlaying = state.isPlaying
+                        val side = minOf(maxWidth, maxHeight) * 0.94f
+                        Box(
+                            modifier = Modifier
+                                .size(side)
+                                .shadow(
+                                    elevation = 28.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    spotColor = dominant,
+                                    ambientColor = dominant
+                                )
+                        ) {
+                            AlbumArtImage(
+                                songId = song.id,
+                                seed = song.album.ifBlank { song.title },
+                                modifier = Modifier.fillMaxSize(),
+                                sizePx = 800,
+                                shape = RoundedCornerShape(16.dp),
+                                showRotatingVinyl = true,
+                                isPlaying = state.isPlaying
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Title and Artist with Format Tag
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = LowspinTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Audio Info & DSP Pill
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(LowspinSurfaceHigh)
+                            .clickable(onClick = onSongInfoClick)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = song.mimeType.substringAfterLast('/').uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Sleep Timer Quick Pill
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(LowspinSurfaceHigh)
+                            .clickable(onClick = onSleepClick)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = sleepLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = LowspinTextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(LowspinSurfaceHigh)
-                        .clickable(onClick = onSleepClick)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = sleepLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            // Real-Time Audio Visualizer (Smooth animated bars / waveform)
+            if (visualizerEnabled) {
+                Spacer(Modifier.height(8.dp))
+                AudioVisualizer(
+                    isPlaying = state.isPlaying,
+                    style = visualizerStyle,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    height = 36.dp
+                )
+            } else {
+                Spacer(Modifier.height(8.dp))
             }
 
-            Spacer(Modifier.height(8.dp))
-
+            // Seek Bar
             SeekBar(state = state, onSeek = onSeek)
 
+            // Playback Transport Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -336,9 +429,9 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // Utility bar: Speed pill, Equalizer, Queue
+            // Utility bar: Speed/Pitch Pill, Equalizer, Queue
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -346,7 +439,7 @@ fun NowPlayingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Playback speed pill
+                // Playback speed/pitch pill
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
@@ -357,13 +450,17 @@ fun NowPlayingScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Speed,
-                        contentDescription = "Playback Speed",
+                        contentDescription = "Playback Speed & Pitch",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "${state.playbackSpeed}x",
+                        text = if (state.playbackPitch != 1f) {
+                            "${state.playbackSpeed}x • ${state.playbackPitch}x pitch"
+                        } else {
+                            "${state.playbackSpeed}x"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -400,7 +497,8 @@ fun NowPlayingScreen(
 private fun LyricsCard(
     lyrics: Lyrics,
     positionMs: Long,
-    isPlaying: Boolean
+    isPlaying: Boolean,
+    onSeek: (Long) -> Unit
 ) {
     val activeIndex = if (lyrics.synced) {
         lyrics.lines.indexOfLast { it.timeMs <= positionMs }
@@ -418,37 +516,67 @@ private fun LyricsCard(
     Box(
         modifier = Modifier
             .fillMaxSize(0.96f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(LowspinSurfaceHigh)
+            .clip(RoundedCornerShape(20.dp))
+            .background(LowspinSurfaceHigh.copy(alpha = 0.95f))
             .padding(16.dp)
     ) {
         if (lyrics.synced) {
             LazyColumn(state = listState) {
                 itemsIndexed(lyrics.lines) { index, line ->
-                    Text(
-                        text = line.text,
-                        style = if (index == activeIndex) {
-                            MaterialTheme.typography.titleSmall
-                        } else {
-                            MaterialTheme.typography.bodyMedium
-                        },
-                        color = if (index == activeIndex) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                    val isActive = index == activeIndex
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    )
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSeek(line.timeMs) }
+                            .background(
+                                if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = line.text,
+                            style = if (isActive) {
+                                MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            } else {
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 15.sp
+                                )
+                            },
+                            color = if (isActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.70f)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (line.timeMs > 0) {
+                            Text(
+                                text = formatDuration(line.timeMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isActive) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
+                            )
+                        }
+                    }
                 }
             }
         } else {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(8.dp)
+            ) {
                 lyrics.lines.forEach { line ->
                     Text(
                         text = line.text,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()

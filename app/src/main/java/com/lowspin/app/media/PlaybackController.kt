@@ -36,6 +36,7 @@ data class PlayerUiState(
     val shuffleEnabled: Boolean = false,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
+    val playbackPitch: Float = 1f,
     val dominantColor: Int = 0,
     val queueSize: Int = 0,
     val sourceLabel: String = "Your library"
@@ -180,6 +181,7 @@ class PlaybackController(
                 shuffleEnabled = mediaController.shuffleModeEnabled,
                 repeatMode = mediaController.repeatMode,
                 playbackSpeed = mediaController.playbackParameters.speed,
+                playbackPitch = mediaController.playbackParameters.pitch,
                 dominantColor = dominant,
                 queueSize = mediaController.mediaItemCount,
                 sourceLabel = currentSourceLabel
@@ -341,12 +343,33 @@ class PlaybackController(
 
     fun setSpeed(speed: Float) {
         val mediaController = controller ?: return
-        mediaController.setPlaybackSpeed(speed)
-        _state.update { it.copy(playbackSpeed = speed) }
+        val currentPitch = mediaController.playbackParameters.pitch
+        val safeSpeed = speed.coerceIn(0.5f, 2.5f)
+        mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(safeSpeed, currentPitch)
+        _state.update { it.copy(playbackSpeed = safeSpeed) }
         persistModes()
     }
 
     fun setPlaybackSpeed(speed: Float) = setSpeed(speed)
+
+    fun setPitch(pitch: Float) {
+        val mediaController = controller ?: return
+        val currentSpeed = mediaController.playbackParameters.speed
+        val safePitch = pitch.coerceIn(0.5f, 2.0f)
+        mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(currentSpeed, safePitch)
+        _state.update { it.copy(playbackPitch = safePitch) }
+    }
+
+    fun setPlaybackPitch(pitch: Float) = setPitch(pitch)
+
+    fun setSpeedAndPitch(speed: Float, pitch: Float) {
+        val mediaController = controller ?: return
+        val safeSpeed = speed.coerceIn(0.5f, 2.5f)
+        val safePitch = pitch.coerceIn(0.5f, 2.0f)
+        mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(safeSpeed, safePitch)
+        _state.update { it.copy(playbackSpeed = safeSpeed, playbackPitch = safePitch) }
+        persistModes()
+    }
 
     fun addToQueue(song: SongEntity) {
         val mediaController = controller ?: return

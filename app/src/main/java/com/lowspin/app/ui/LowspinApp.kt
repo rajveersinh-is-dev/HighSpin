@@ -65,6 +65,7 @@ import com.lowspin.app.di.AppContainer
 import com.lowspin.app.ui.components.CreatePlaylistDialog
 import com.lowspin.app.ui.components.MiniPlayer
 import com.lowspin.app.ui.components.QueueSheet
+import com.lowspin.app.ui.components.SongInfoSheet
 import com.lowspin.app.ui.components.SongOptionsSheet
 import com.lowspin.app.ui.components.SpeedPickerSheet
 import com.lowspin.app.ui.screens.about.AboutScreen
@@ -203,6 +204,7 @@ fun LowspinApp(container: AppContainer) {
     val sleepEndsAt by container.sleepTimer.endsAt.collectAsStateWithLifecycle()
     val sleepMode by container.sleepTimer.mode.collectAsStateWithLifecycle()
     var optionsSong by remember { mutableStateOf<SongEntity?>(null) }
+    var infoSong by remember { mutableStateOf<SongEntity?>(null) }
     var songToHide by remember { mutableStateOf<SongEntity?>(null) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
@@ -510,7 +512,8 @@ fun LowspinApp(container: AppContainer) {
                     showNowPlaying = false
                     navController.navigate("equalizer")
                 },
-                onQueueClick = { showQueueSheet = true }
+                onQueueClick = { showQueueSheet = true },
+                onSongInfoClick = { currentSong?.let { infoSong = it } }
             )
         }
     }
@@ -543,6 +546,11 @@ fun LowspinApp(container: AppContainer) {
                     optionsSong = null
                 }
             },
+            onShowInfo = {
+                val s = song
+                optionsSong = null
+                infoSong = s
+            },
             onRemoveFromPlaylist = if (currentPlaylistId != null) {
                 {
                     scope.launch {
@@ -555,6 +563,13 @@ fun LowspinApp(container: AppContainer) {
                 songToHide = song
                 optionsSong = null
             }
+        )
+    }
+
+    infoSong?.let { song ->
+        SongInfoSheet(
+            song = song,
+            onDismiss = { infoSong = null }
         )
     }
 
@@ -685,8 +700,12 @@ fun LowspinApp(container: AppContainer) {
     if (showSpeedSheet) {
         SpeedPickerSheet(
             currentSpeed = playerState.playbackSpeed,
+            currentPitch = playerState.playbackPitch,
             onSpeedSelected = { speed ->
                 container.playbackController.setPlaybackSpeed(speed)
+            },
+            onPitchSelected = { pitch ->
+                container.playbackController.setPlaybackPitch(pitch)
             },
             onDismiss = { showSpeedSheet = false }
         )

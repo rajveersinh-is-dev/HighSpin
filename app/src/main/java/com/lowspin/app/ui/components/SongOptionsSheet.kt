@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
@@ -65,6 +66,7 @@ fun SongOptionsSheet(
     onAddToQueue: () -> Unit,
     onAddToPlaylist: (Long) -> Unit,
     onCreatePlaylist: (String) -> Unit,
+    onShowInfo: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onRemoveFromLibrary: (() -> Unit)? = null
 ) {
@@ -143,6 +145,13 @@ fun SongOptionsSheet(
                     label = "Add to playlist",
                     onClick = { showPlaylistPicker = true }
                 )
+                if (onShowInfo != null) {
+                    SheetActionRow(
+                        icon = Icons.Rounded.Info,
+                        label = "Track info & audio specs",
+                        onClick = onShowInfo
+                    )
+                }
                 if (onRemoveFromPlaylist != null) {
                     SheetActionRow(
                         icon = Icons.Rounded.DeleteOutline,
@@ -154,7 +163,7 @@ fun SongOptionsSheet(
                 if (onRemoveFromLibrary != null) {
                     SheetActionRow(
                         icon = Icons.Rounded.HideSource,
-                        label = "Remove from Lowspin",
+                        label = "Remove from HighSpin",
                         tint = MaterialTheme.colorScheme.error,
                         onClick = onRemoveFromLibrary
                     )

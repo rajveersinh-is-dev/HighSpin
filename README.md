@@ -1,25 +1,49 @@
 # HighSpin 🎵
 
-**HighSpin** is a blazingly fast, modern, 100% offline local music player for Android, built with Jetpack Compose, ExoPlayer (Media3), Room Database, and Kotlin Coroutines.
+**HighSpin** is a blazingly fast, modern, ultra-lightweight, 100% offline local music player for Android, built with Jetpack Compose, ExoPlayer (Media3), Room Database, and Kotlin Coroutines.
 
-No accounts, zero network permissions, zero tracking, and zero ads. HighSpin turns your device into an audiophile listening station with manual equalizer DSP, synchronized `.lrc` lyrics, discography exploration, and queue management.
+No accounts, zero network permissions, zero tracking, and zero ads. HighSpin turns your device into an audiophile listening station with manual equalizer DSP, synchronized `.lrc` lyrics with click-to-seek, turntable vinyl animations, animated real-time audio visualizers, and customizable aesthetic themes.
+
+---
+
+## 📦 Download Latest APK
+
+Grab the ready-to-install APK directly from GitHub Releases:
+
+- **[Download HighSpin Release APK (v2.1.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.9 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.1.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~21 MB - Full debug runtime & symbols)
 
 ---
 
 ## ✨ Features
 
-### 🎧 Precision Audio & Equalizer DSP
+### 🎨 Aesthetic Design & Cool Micro-Interactions
+- **Aesthetic Color Themes:** Choose between 7 themes: *HighSpin Violet*, *Cyberpunk Neon*, *Emerald Groove*, *Sunset Horizon*, *Electric Ocean*, *Sakura Synth*, and *Golden Pulse*.
+- **Pure Black (AMOLED) Mode:** True `#000000` pitch-black backgrounds for OLED battery savings and maximum contrast.
+- **Spinning Vinyl Turntable Mode:** Interactive turntable with dynamic album art center label, physical micro-grooves, specular sheen reflections, moving tonearm stylus needle, and breathing ambient halo glow.
+- **Animated Real-Time Audio Visualizer:** High-framerate Compose Canvas visualizer with 3 selectable modes: *Dynamic Equalizer Bars with Peak Caps*, *Glowing Neon Waves*, and *Minimalist Pulse Dots*.
+- **Pulsing Backlight Halo:** Dynamic radial ambient glow matching the album art dominant color breathing in sync with playback.
+
+### ⚡ Ultra-Lightweight & Fast
+- **Sub-3MB Footprint:** Aggressive R8 tree-shaking, dead code elimination, and resource shrinking reduced APK size by 86% (from 21.4 MB down to 2.9 MB).
+- **Fast Startup & Low Memory Usage:** Memory-efficient bitmap downsampling, bounded LRU caches, and zero heavy third-party framework dependencies.
+
+### 🎧 Precision Audio DSP, Speed & Pitch Shifting
 - **Hardware-Accelerated Equalizer:** 5-band manual frequency sliders with real-time millibel adjustments.
 - **10 Audio Presets:** Flat, Bass Boost, Vocal Boost, Acoustic, Rock, Pop, Jazz, Classical, Hip Hop, and Electronic.
 - **BassBoost & 3D Virtualizer:** Dynamic spatial audio and low-end frequency enhancement with smooth slider controls.
-- **Playback Speed Controller:** Granular pitch-preserving speed picker ranging from `0.5x` up to `2.5x`.
+- **Independent Speed & Pitch Control:** Granular playback tempo slider (`0.5x` - `2.5x`) and independent pitch shifting (`0.5x` - `1.8x`).
+- **DJ DSP Presets:** Instant one-tap presets for *Nightcore* (+15% tempo & pitch), *Slowed & Reverb* (0.85x tempo & pitch), *Sped Up*, and *Deep Pitch*.
 - **ExoPlayer Media3 Architecture:** Gapless playback, audio focus handling, and automatic ducking during calls/navigation.
 
-### 📝 Synced Lyrics & Tag Parsing
-- **External `.lrc` Auto-Detection:** Automatically discovers local `.lrc` files in track directories and device storage.
-- **Sub-Second Synced Scrolling:** Auto-scrolls and highlights the active lyric line synchronously as playback advances.
-- **Multi-Timestamp & Offset Support:** Supports combined timestamps (e.g., repeated chorus lines `[00:10.00][00:20.00]`) and `[offset: +/-ms]` tags.
-- **Embedded ID3 Tag Decoder:** Pure Kotlin binary parser for ID3v2.2, ID3v2.3, and ID3v2.4 `USLT` frames.
+### 📝 Synced Lyrics with Click-to-Seek
+- **Click-to-Seek Karaoke:** Tapping any lyric line instantly seeks the song to that exact timestamp with sub-second accuracy.
+- **Active Line Glowing Highlight:** Bold, neon-accented karaoke line with timestamp tags and smooth auto-scrolling.
+- **Embedded & External Lyrics:** Discovers local `.lrc` files and decodes embedded ID3v2 `USLT` frames.
+
+### 🔍 Technical Audio Specs & File Sharing
+- **Song Info Inspector:** Detailed audio specifications bottom sheet displaying format container badge (FLAC, MP3, AAC, WAV, OGG, OPUS), bitrate (kbps), sample rate (kHz), file size (MB), track/disc number, date added, and storage path.
+- **One-Tap File Sharing:** Seamlessly share audio files via standard Android sharing sheet to other apps, chats, or devices without requiring cloud uploads.
 
 ### 📚 Expanded 5-Tab Library Browsing
 - **Songs:** Complete catalog with instant filtering, sort order, and playing indicator.
@@ -30,7 +54,6 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 ### 🎛️ Queue Management & Player UI
 - **Interactive Queue Sheet:** Reorder upcoming tracks, view live playback state, and swipe or tap to remove songs.
-- **Full-Screen Now Playing:** Rotating vinyl glyph animation, blurred dynamic palette gradients, seek bar, repeat modes, and quick sleep timer.
 - **Sleep Timer:** Sleep after minutes (`5`, `10`, `15`, `30`, `45`, `60`) or gracefully stop at the end of the current track.
 - **Mini Player:** Persistent, dismissable compact player bar with play/pause and like controls.
 
@@ -54,10 +77,10 @@ com.lowspin.app/
 ├── di/               # Lightweight manual Dependency Injection container (AppContainer)
 ├── media/            # ExoPlayer Media3 PlaybackService, EqualizerManager, SmartShuffle
 ├── ui/
-│   ├── components/   # SongRow, AlbumArtImage, QueueSheet, SpeedPickerSheet, MiniPlayer
+│   ├── components/   # AudioVisualizer, TurntableVinyl, SongInfoSheet, SongRow, QueueSheet, MiniPlayer
 │   ├── screens/      # Library, AlbumDetail, ArtistDetail, FolderDetail, Equalizer, Settings
-│   ├── settings/     # Appearance preferences & accessibility styling
-│   └── theme/        # Spotify-inspired Material3 dark theme & dynamic accent colors
+│   ├── settings/     # Appearance preferences & 7 aesthetic theme presets
+│   └── theme/        # Material3 dynamic dark & AMOLED pure black themes
 └── util/             # Millisecond formatting & time utilities
 ```
 
@@ -73,6 +96,7 @@ com.lowspin.app/
 
 HighSpin includes a suite of JUnit 4 and Kotlin unit tests verifying all algorithmic invariants:
 
+- **`AudioModPresetsTest`:** Verifies tempo and pitch DSP parameter ranges, available speeds integrity, and theme palette validity.
 - **`LrcParserTest`:** Verifies standard LRC parsing, multi-timestamp line duplication, positive/negative offset shifts, millisecond fraction lengths, and un-synced plaintext fallbacks.
 - **`TrackFilterTest`:** Verifies exclusion of OEM call recordings, WhatsApp/Telegram audio notes, screencasts, and preserves legitimate music titles.
 - **`SmartShuffleTest`:** Verifies repeat prevention across playback loops, queue boundary safety, and repeat-one mode respect.
@@ -93,6 +117,16 @@ Run the test suite locally:
 - Android SDK with `build-tools;34.0.0` and `platforms;android-34`
 - Set `ANDROID_HOME` and `JAVA_HOME` environment variables
 
+### Build Release APK (Lightweight ~2.9MB)
+```bash
+# Windows
+gradlew.bat assembleRelease
+
+# Linux / macOS
+./gradlew assembleRelease
+```
+The compiled APK will be generated at `app/build/outputs/apk/release/app-release.apk`.
+
 ### Build Debug APK
 ```bash
 # Windows
@@ -105,14 +139,15 @@ The compiled APK will be generated at `app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-## 🚀 CI/CD
+## 🚀 CI/CD & Automated Releases
 
 HighSpin includes a GitHub Actions workflow in `.github/workflows/android.yml` that automatically:
 1. Checks out code on Ubuntu runners
 2. Sets up Temurin JDK 17 with Gradle caching
 3. Runs all unit tests via `gradlew testDebugUnitTest`
-4. Builds the debug APK via `gradlew assembleDebug`
-5. Uploads the resulting APK artifact for every push and PR to `main`
+4. Builds both release and debug APKs via `gradlew assembleRelease assembleDebug`
+5. Uploads APK artifacts for every push and PR to `main`
+6. Automatically publishes a GitHub Release with attached APK binaries and SHA256 checksums whenever a tag `v*` is pushed
 
 ---
 

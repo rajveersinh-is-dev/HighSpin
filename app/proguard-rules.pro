@@ -1,2 +1,9 @@
-# Lowspin keeps no obfuscation rules of its own. Room and Media3 ship their own
-# consumer rules, and release builds are not minified in this project.
+# HighSpin Proguard/R8 optimization rules
+-keep class com.lowspin.app.data.db.** { *; }
+-keep class com.lowspin.app.media.PlaybackService { *; }
+-keep class com.lowspin.app.media.ArtworkProvider { *; }
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# Keep Room generated migrations and schemas
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
