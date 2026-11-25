@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,14 +111,23 @@ fun MiniPlayer(
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = LowspinTextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.basicMarquee()
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.isPlaying) {
+                        VinylGlyph(
+                            modifier = Modifier.size(13.dp),
+                            rotating = true
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = LowspinTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee()
+                    )
+                }
                 Text(
                     text = song.artist,
                     style = MaterialTheme.typography.bodySmall,
@@ -151,7 +161,14 @@ fun MiniPlayer(
                 Modifier
                     .fillMaxWidth(progress)
                     .height(2.5.dp)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.secondary,
+                                MaterialTheme.colorScheme.primary
+                            )
+                        )
+                    )
             )
         }
     }

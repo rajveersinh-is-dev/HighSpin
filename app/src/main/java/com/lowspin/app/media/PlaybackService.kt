@@ -37,7 +37,7 @@ import kotlinx.coroutines.runBlocking
 class PlaybackService : MediaSessionService() {
 
     companion object {
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.media"
+        const val NOTIFICATION_CHANNEL_ID = HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         const val FADE_DURATION_MS = 5_000L
         const val TIMER_TICK_MS = 250L
     }
@@ -118,10 +118,17 @@ class PlaybackService : MediaSessionService() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+
+        // Clean up legacy channel that was stuck on IMPORTANCE_LOW
+        runCatching {
+            manager.deleteNotificationChannel(HighSpinLiveNotificationProvider.LEGACY_NOTIFICATION_CHANNEL_ID)
+        }
+
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "HighSpin live playback controls and status-bar updates"
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
@@ -129,7 +136,7 @@ class PlaybackService : MediaSessionService() {
             enableVibration(false)
             setSound(null, null)
         }
-        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+        manager.createNotificationChannel(channel)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

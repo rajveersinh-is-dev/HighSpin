@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -261,9 +262,14 @@ fun NowPlayingScreen(
                                 .size(side)
                                 .shadow(
                                     elevation = 28.dp,
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(18.dp),
                                     spotColor = dominant,
                                     ambientColor = dominant
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                    shape = RoundedCornerShape(18.dp)
                                 )
                         ) {
                             AlbumArtImage(
@@ -271,7 +277,7 @@ fun NowPlayingScreen(
                                 seed = song.album.ifBlank { song.title },
                                 modifier = Modifier.fillMaxSize(),
                                 sizePx = 800,
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(18.dp),
                                 showRotatingVinyl = true,
                                 isPlaying = state.isPlaying
                             )

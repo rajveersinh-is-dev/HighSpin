@@ -32,10 +32,11 @@ import kotlin.math.sin
 
 /**
  * High-performance, hardware-accelerated animated audio visualizer.
- * Supports 3 styles:
+ * Supports 4 aesthetic styles:
  * - 0: Dynamic Equalizer Spectrum Bars with floating peak caps
  * - 1: Glowing Multi-Harmonic Neon Waves
  * - 2: Minimalist Dancing Rhythm Dots
+ * - 3: Liquid Aura / Harmonic Flow with volumetric fluid bloom
  */
 @Composable
 fun AudioVisualizer(
@@ -120,6 +121,18 @@ fun AudioVisualizer(
                     phase1 = phase1,
                     spectrumShape = spectrumShape,
                     primary = primary
+                )
+            }
+            3 -> {
+                // Style 3: Liquid Aura / Harmonic Flow
+                drawLiquidAura(
+                    width = width,
+                    canvasHeight = canvasHeight,
+                    playFactor = playFactor,
+                    phase1 = phase1,
+                    phase2 = phase2,
+                    primary = primary,
+                    secondary = secondary
                 )
             }
             else -> {
@@ -271,4 +284,67 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPulseDots(
             center = Offset(cx, cy)
         )
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLiquidAura(
+    width: Float,
+    canvasHeight: Float,
+    playFactor: Float,
+    phase1: Float,
+    phase2: Float,
+    primary: Color,
+    secondary: Color
+) {
+    val centerY = canvasHeight * 0.52f
+    val amplitude = (canvasHeight * 0.38f) * playFactor
+
+    val path = Path()
+    val fillPath = Path()
+    fillPath.moveTo(0f, canvasHeight)
+
+    val steps = 44
+    val stepX = width / steps
+
+    for (step in 0..steps) {
+        val x = step * stepX
+        val norm = step.toFloat() / steps
+        val envelope = sin((norm * PI).toFloat())
+        val wave = sin(phase1 + norm * 2.8f * PI.toFloat()) * 0.65f +
+            cos(phase2 + norm * 3.8f * PI.toFloat()) * 0.35f
+        val y = centerY + wave * amplitude * envelope
+
+        if (step == 0) {
+            path.moveTo(x, y)
+            fillPath.lineTo(x, y)
+        } else {
+            path.lineTo(x, y)
+            fillPath.lineTo(x, y)
+        }
+    }
+
+    fillPath.lineTo(width, canvasHeight)
+    fillPath.close()
+
+    // Volumetric luminous under-glow
+    drawPath(
+        path = fillPath,
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                primary.copy(alpha = 0.28f * playFactor),
+                secondary.copy(alpha = 0.08f * playFactor),
+                Color.Transparent
+            ),
+            startY = centerY - amplitude,
+            endY = canvasHeight
+        )
+    )
+
+    // Vibrant surface wave crest
+    drawPath(
+        path = path,
+        brush = Brush.horizontalGradient(
+            colors = listOf(primary, secondary, primary)
+        ),
+        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+    )
 }

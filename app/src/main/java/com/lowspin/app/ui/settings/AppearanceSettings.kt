@@ -81,6 +81,30 @@ val HighSpinThemes = listOf(
         secondary = Color(0xFFFFB300),
         surface = Color(0xFF221B0F),
         background = Color(0xFF130E07)
+    ),
+    ThemePreset(
+        id = "aurora",
+        name = "Midnight Aurora",
+        primary = Color(0xFF00F5D4),
+        secondary = Color(0xFF7B2CBF),
+        surface = Color(0xFF0D1B2A),
+        background = Color(0xFF060B12)
+    ),
+    ThemePreset(
+        id = "synthwave",
+        name = "Synthwave 84",
+        primary = Color(0xFFFF2A85),
+        secondary = Color(0xFF05D9E8),
+        surface = Color(0xFF1E152A),
+        background = Color(0xFF100A1A)
+    ),
+    ThemePreset(
+        id = "frost",
+        name = "Nordic Frost",
+        primary = Color(0xFF64D2FF),
+        secondary = Color(0xFF80E5FF),
+        surface = Color(0xFF121B26),
+        background = Color(0xFF080E16)
     )
 )
 
@@ -123,7 +147,7 @@ class AppearanceSettings(context: Context) {
     private val _visualizerEnabled = MutableStateFlow(prefs.getBoolean(KEY_VISUALIZER, true))
     val visualizerEnabled: StateFlow<Boolean> = _visualizerEnabled.asStateFlow()
 
-    private val _visualizerStyle = MutableStateFlow(prefs.getInt(KEY_VISUALIZER_STYLE, 0).coerceIn(0, 2))
+    private val _visualizerStyle = MutableStateFlow(prefs.getInt(KEY_VISUALIZER_STYLE, 0).coerceIn(0, 3))
     val visualizerStyle: StateFlow<Int> = _visualizerStyle.asStateFlow()
 
     private val _textScale = MutableStateFlow(prefs.getFloat(KEY_TEXT_SCALE, 1f))
@@ -169,7 +193,7 @@ class AppearanceSettings(context: Context) {
         .also { _visualizerEnabled.value = enabled }
 
     fun setVisualizerStyle(style: Int) {
-        val safe = style.coerceIn(0, 2)
+        val safe = style.coerceIn(0, 3)
         store { putInt(KEY_VISUALIZER_STYLE, safe) }
         _visualizerStyle.value = safe
     }

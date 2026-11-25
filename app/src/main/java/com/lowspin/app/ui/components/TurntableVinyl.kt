@@ -37,6 +37,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.ui.LocalAlbumArtRepository
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
  * Photorealistic turntable vinyl component with:
@@ -90,6 +92,9 @@ fun TurntableVinyl(
     )
 
     val currentRotation = if (isPlaying && !reduceMotion) spinAngle else 0f
+    val needleJitter = if (isPlaying && !reduceMotion) {
+        0.35f * sin((spinAngle * 4f * PI.toFloat() / 180f))
+    } else 0f
     val accent = dominantColor
 
     Box(
@@ -151,6 +156,14 @@ fun TurntableVinyl(
                         style = Stroke(width = 1.2.dp.toPx())
                     )
                 }
+
+                // Run-out groove transition ring with golden sheen
+                drawCircle(
+                    color = Color(0xFFD4AF37).copy(alpha = 0.25f),
+                    radius = r * 0.435f,
+                    center = center,
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
 
                 // Vinyl specular light sheen wedges (giving 3D vinyl reflections)
                 drawCircle(
@@ -224,7 +237,7 @@ fun TurntableVinyl(
                     .graphicsLayer {
                         // Pivot around top-right base
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.85f, 0.15f)
-                        rotationZ = needleAngle
+                        rotationZ = needleAngle + needleJitter
                     }
             ) {
                 val base = Offset(size.width * 0.85f, size.height * 0.15f)

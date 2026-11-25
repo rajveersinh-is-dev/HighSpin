@@ -212,7 +212,12 @@ fun SettingsScreen(
                 if (visualizerEnabled) {
                     ChoiceRow(
                         title = "Visualizer Animation Style",
-                        options = listOf("Equalizer Bars" to 0f, "Neon Wave" to 1f, "Pulse Dots" to 2f),
+                        options = listOf(
+                            "Equalizer Bars" to 0f,
+                            "Neon Wave" to 1f,
+                            "Pulse Dots" to 2f,
+                            "Liquid Aura" to 3f
+                        ),
                         selected = visualizerStyle.toFloat(),
                         onSelect = { appearance.setVisualizerStyle(it.toInt()) }
                     )

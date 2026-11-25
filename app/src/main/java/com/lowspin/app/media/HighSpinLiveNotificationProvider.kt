@@ -1,8 +1,12 @@
 package com.lowspin.app.media
 
+import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.Icon
+import android.os.Build
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
@@ -16,39 +20,48 @@ import com.lowspin.app.ui.settings.AppearanceSettings
 import java.io.File
 
 /**
- * Clean, minimal, Android 15+ live notification provider for HighSpin.
+ * Clean, minimal, Android 15 & 16 + OnePlus OxygenOS 15 Live Notification provider for HighSpin.
  *
- * Ensures:
+ * Implements [MediaNotification.Provider] directly around an underlying [DefaultMediaNotificationProvider]
+ * so that:
  * 1. Status-bar live capsules, dynamic island chips, and lock screen widgets show the
- *    live track title and artist instead of a static app label fallback.
+ *    live track title and artist instead of a static app fallback.
  * 2. Real-time ongoing progress and transport controls are mapped accurately.
  * 3. High-resolution local album art bitmap is supplied safely to the notification
  *    header (without binder blocking or OOM/IPC overflows) so lockscreen and notification
  *    shade cards render album art crisply.
  * 4. Android 15 & 16 Promoted Ongoing (Live Updates) flags and extras are set.
- * 5. Uses native chronometer ticking so the status bar and notification track
+ * 5. DefaultMediaNotificationProvider hardcodes [Notification.FLAG_ONGOING_EVENT] to false,
+ *    which causes Android 15 and OnePlus OxygenOS 15 to reject the live capsule. We enforce
+ *    [Notification.FLAG_ONGOING_EVENT] whenever playback is active.
+ * 6. OnePlus OxygenOS 15 / ColorOS 15 Fluid Cloud & Live Alert capsule keys are supplied.
+ * 7. Uses native chronometer ticking so the status bar and notification track
  *    real-time playback elapsed duration without waking the CPU every second.
- * 6. Respects user toggle in [AppearanceSettings.liveNotifications].
+ * 8. Respects user toggle in [AppearanceSettings.liveNotifications].
  */
 @OptIn(UnstableApi::class)
 class HighSpinLiveNotificationProvider(
     private val context: Context
-) : DefaultMediaNotificationProvider(
-    context,
-    { NOTIFICATION_ID },
-    NOTIFICATION_CHANNEL_ID,
-    R.string.notification_channel_name
-) {
+) : MediaNotification.Provider {
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.media"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live"
+        const val LEGACY_NOTIFICATION_CHANNEL_ID = "com.lowspin.app.media"
 
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText"
         const val EXTRA_SUBST_NAME = "android.substName"
         const val EXTRA_ONGOING = "android.ongoing"
         const val EXTRA_SHOW_CHRONOMETER = "android.showChronometer"
+
+        // OnePlus OxygenOS 15 / ColorOS 15 Fluid Cloud & Live Alert capsule extras
+        const val EXTRA_OPLUS_ONGOING = "oplus.ongoing"
+        const val EXTRA_OPLUS_CAPSULE = "oplus_capsule"
+        const val EXTRA_OPLUS_COM_CAPSULE = "com.oplus.capsule"
+        const val EXTRA_OPLUS_CAPSULE_TYPE = "oplus.capsule.type"
+        const val EXTRA_LIVE_NOTIFICATION = "is_live_notification"
+        const val EXTRA_ANDROID_LIVE_NOTIFICATION = "android.liveNotification"
 
         fun formatTicker(title: String?, artist: String?): String {
             val safeTitle = title?.takeIf { it.isNotBlank() } ?: "HighSpin"
@@ -70,18 +83,52 @@ class HighSpinLiveNotificationProvider(
 
     private val appearance by lazy { AppearanceSettings(context) }
 
-    init {
+    private val defaultProvider = DefaultMediaNotificationProvider(
+        context,
+        { NOTIFICATION_ID },
+        NOTIFICATION_CHANNEL_ID,
+        R.string.notification_channel_name
+    ).apply {
         setSmallIcon(R.drawable.ic_stat_vinyl)
     }
 
-    override fun addNotificationActions(
+    override fun createNotification(
         mediaSession: MediaSession,
-        mediaButtons: ImmutableList<CommandButton>,
-        builder: NotificationCompat.Builder,
-        actionFactory: MediaNotification.ActionFactory
-    ): IntArray {
-        val actionIndices = super.addNotificationActions(mediaSession, mediaButtons, builder, actionFactory)
+        customLayout: ImmutableList<CommandButton>,
+        actionFactory: MediaNotification.ActionFactory,
+        onNotificationChangedCallback: MediaNotification.Provider.Callback
+    ): MediaNotification {
+        val wrappedCallback = MediaNotification.Provider.Callback { updatedMediaNotification ->
+            val processed = decorateNotification(mediaSession, updatedMediaNotification)
+            onNotificationChangedCallback.onNotificationChanged(processed)
+        }
 
+        val baseMediaNotification = defaultProvider.createNotification(
+            mediaSession,
+            customLayout,
+            actionFactory,
+            wrappedCallback
+        )
+
+        return decorateNotification(mediaSession, baseMediaNotification)
+    }
+
+    override fun handleCustomCommand(
+        mediaSession: MediaSession,
+        action: String,
+        extras: Bundle
+    ): Boolean {
+        return defaultProvider.handleCustomCommand(mediaSession, action, extras)
+    }
+
+    /**
+     * Enforces Android 15 & 16 Promoted Ongoing flags and OnePlus OxygenOS 15 Live Alerts / Fluid Cloud
+     * capsule integration on the built notification.
+     */
+    private fun decorateNotification(
+        mediaSession: MediaSession,
+        mediaNotification: MediaNotification
+    ): MediaNotification {
         val player = mediaSession.player
         val isPlaying = player.playWhenReady
         val isLiveEnabled = appearance.liveNotifications.value
@@ -89,92 +136,109 @@ class HighSpinLiveNotificationProvider(
         val title = metadata.title?.toString()?.takeIf { it.isNotBlank() } ?: "HighSpin"
         val artist = metadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: "Local Audio"
         val album = metadata.albumTitle?.toString()?.takeIf { it.isNotBlank() } ?: "HighSpin"
-
-        // 1. Live Ticker for Android 15 & OEM Status Bar Live Alerts / Capsule
-        if (isLiveEnabled && isPlaying) {
-            builder.setTicker(formatTicker(title, artist))
-        } else {
-            builder.setTicker(null)
-        }
-
-        // 2. Ongoing flag: critical for Android 15 live activity / status bar pill
-        builder.setOngoing(isPlaying)
-
-        // 3. Clean minimal metadata
-        builder.setContentTitle(title)
-        builder.setContentText(artist)
-        builder.setSubText(album)
-        builder.setSmallIcon(R.drawable.ic_stat_vinyl)
-        builder.setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-        builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-        builder.setOnlyAlertOnce(true)
-
-        // 4. Live Chronometer Ticking for Status Bar Pill & Lockscreen Cards
         val position = player.currentPosition
-        if (isLiveEnabled && isPlaying && position >= 0L) {
-            builder.setShowWhen(true)
-            builder.setUsesChronometer(true)
-            builder.setWhen(System.currentTimeMillis() - position)
-        } else {
-            builder.setShowWhen(false)
-            builder.setUsesChronometer(false)
-        }
-
-        // 5. Live Progress Tracking for Lock Screen and Notification Shade
         val duration = player.duration
-        val progress = computeProgress(position, duration)
-        if (progress != null) {
-            builder.setProgress(progress.first, progress.second, false)
+        val shortCritical = formatShortCritical(title)
+
+        val notification = mediaNotification.notification
+
+        // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
+        // DefaultMediaNotificationProvider hardcodes setOngoing(false) right before build(), so we restore it:
+        if (isPlaying) {
+            notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
         } else {
-            builder.setProgress(0, 0, false)
+            notification.flags = (notification.flags and Notification.FLAG_ONGOING_EVENT.inv() and Notification.FLAG_NO_CLEAR.inv())
         }
 
-        // 6. Safe Album Art Bitmap for Large Icon (bounded decode, no binder block)
+        // 2. High priority transport category & public lockscreen visibility
+        notification.category = NotificationCompat.CATEGORY_TRANSPORT
+        notification.visibility = NotificationCompat.VISIBILITY_PUBLIC
+        notification.priority = NotificationCompat.PRIORITY_DEFAULT
+
+        // 3. Status-bar live ticker text
+        if (isLiveEnabled && isPlaying) {
+            notification.tickerText = formatTicker(title, artist)
+        } else {
+            notification.tickerText = null
+        }
+
+        // 4. Live Chronometer Ticking for status bar pill & lockscreen cards
+        if (isLiveEnabled && isPlaying && position >= 0L) {
+            notification.`when` = System.currentTimeMillis() - position
+        }
+
+        // 5. Safe Album Art Bitmap for large icon if present
         val currentMediaItem = player.currentMediaItem
         val songId = currentMediaItem?.mediaId?.toLongOrNull()
         if (songId != null) {
             loadCachedArtBitmapSafe(songId)?.let { bitmap ->
-                builder.setLargeIcon(bitmap)
+                notification.largeIcon = bitmap
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    notification.extras.putParcelable(
+                        Notification.EXTRA_LARGE_ICON,
+                        Icon.createWithBitmap(bitmap)
+                    )
+                }
             }
         }
 
-        // 7. Android 15 & 16 Promoted Ongoing Live Updates flags and extras
-        val shortCritical = formatShortCritical(title)
-        builder.extras.apply {
+        // 6. Complete Android 15 Promoted Ongoing (Live Updates) & OnePlus OxygenOS 15 Live Alerts extras
+        notification.extras.apply {
             putBoolean(EXTRA_ONGOING, isPlaying)
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")
+
             if (isLiveEnabled) {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, isPlaying)
                 putCharSequence(EXTRA_SHORT_CRITICAL_TEXT, shortCritical)
                 if (isPlaying) {
                     putBoolean(EXTRA_SHOW_CHRONOMETER, true)
                 }
+
+                // OnePlus OxygenOS 15 & ColorOS 15 Live Alerts / Fluid Cloud capsule keys
+                putBoolean(EXTRA_OPLUS_ONGOING, isPlaying)
+                putBoolean(EXTRA_OPLUS_CAPSULE, isPlaying)
+                putBoolean(EXTRA_OPLUS_COM_CAPSULE, isPlaying)
+                putString(EXTRA_OPLUS_CAPSULE_TYPE, "music")
+                putBoolean(EXTRA_LIVE_NOTIFICATION, isPlaying)
+                putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, isPlaying)
             } else {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false)
+                putBoolean(EXTRA_OPLUS_CAPSULE, false)
+                putBoolean(EXTRA_OPLUS_COM_CAPSULE, false)
+                putBoolean(EXTRA_LIVE_NOTIFICATION, false)
+                putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, false)
+            }
+
+            // Real-time track progress
+            val progress = computeProgress(position, duration)
+            if (progress != null) {
+                putInt(NotificationCompat.EXTRA_PROGRESS_MAX, progress.first)
+                putInt(NotificationCompat.EXTRA_PROGRESS, progress.second)
+                putBoolean(NotificationCompat.EXTRA_PROGRESS_INDETERMINATE, false)
             }
         }
 
-        // Forward compatibility reflection if method exists on NotificationCompat.Builder
+        // Forward compatibility reflection if method exists on Notification
         if (isLiveEnabled) {
             runCatching {
-                val method = builder.javaClass.getMethod(
+                val method = notification.javaClass.getMethod(
                     "setRequestPromotedOngoing",
                     Boolean::class.javaPrimitiveType
                 )
-                method.invoke(builder, isPlaying)
+                method.invoke(notification, isPlaying)
             }
             runCatching {
-                val method = builder.javaClass.getMethod(
+                val method = notification.javaClass.getMethod(
                     "setShortCriticalText",
                     CharSequence::class.java
                 )
-                method.invoke(builder, shortCritical)
+                method.invoke(notification, shortCritical)
             }
         }
 
-        return actionIndices
+        return mediaNotification
     }
 
     /**

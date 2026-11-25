@@ -10,28 +10,29 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 Grab the ready-to-install APK directly from GitHub Releases:
 
-- **[Download HighSpin Release APK (v2.2.1)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.86 MB - Ultra lightweight, R8 minified & resource-shrunk)
-- **[Download HighSpin Debug APK (v2.2.1)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~21 MB - Full debug runtime & symbols)
+- **[Download HighSpin Release APK (v2.3.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.86 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.3.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~21 MB - Full debug runtime & symbols)
 
 ---
 
 ## ✨ Features
 
-### 🔔 Android 15 & 16 Live Notifications & Live Alerts
-- **Status Bar Live Capsule & Dynamic Island:** Displays real-time song title and artist ticker directly inside status bar chips, OEM live alerts (OxygenOS 15, One UI 7, HyperOS 2), and notification drawer headers—fixing static app label fallbacks.
+### 🔔 Android 15/16 Live Notifications & OnePlus OxygenOS 15 Live Alerts
+- **OnePlus OxygenOS 15 / ColorOS 15 Live Alerts & Fluid Cloud:** Full support for punch-hole capsule, status bar live chip, and lock screen focus mode with native `lyricInfo` and `oplus_capsule` protocol integration.
+- **Enforced Ongoing Flags:** Eliminates `FLAG_ONGOING_EVENT` stripping by `DefaultMediaNotificationProvider`, ensuring Android 15 & OxygenOS recognize HighSpin as an active live activity.
+- **Refreshed High-Priority Silent Media Channel:** Upgraded to `IMPORTANCE_DEFAULT` with disabled sound/vibrations, allowing status-bar live chips and heads-up capsules without noisy notification chimes.
 - **Promoted Ongoing Notifications:** Leverages Android 15 & 16 Live Updates API (`POST_PROMOTED_NOTIFICATIONS`) for prioritized lock screen and notification tray placement.
-- **Live Seek & Progress Bar:** Real-time playback position tracking on lock screen cards and notification widgets.
-- **Clean Transport Controls:** High-resolution embedded album art, previous/pause/next controls, and silent low-importance notification channel.
+- **Live Seek & Chronometer:** Real-time playback position and chronometer duration tracking on status-bar capsules, lock screen cards, and notification widgets.
+- **Clean Transport Controls:** High-resolution embedded album art, previous/pause/next controls, and safe IPC bitmap downsampling.
 
-### 🎨 Clean & Minimal Modern UI
+### 🎨 Clean & Minimal Aesthetic Modern UI
+- **10 Aesthetic Color Themes:** Choose between 10 breathtaking colorways: *HighSpin Violet*, *Cyberpunk Neon*, *Emerald Groove*, *Sunset Horizon*, *Electric Ocean*, *Sakura Synth*, *Golden Pulse*, plus newly added *Midnight Aurora*, *Synthwave 84*, and *Nordic Frost*.
+- **4 Animated Audio Visualizer Modes:** High-framerate Compose Canvas visualizer with: *Dynamic Equalizer Bars with Peak Caps*, *Glowing Neon Waves*, *Minimalist Pulse Dots*, and the new *Liquid Aura / Harmonic Flow* with volumetric fluid under-glow.
+- **Enhanced Photorealistic Turntable Vinyl:** Interactive 33.3 RPM turntable with dynamic album art center label, concentric physical micro-grooves, specular sheen reflections, golden run-out groove ring, moving tonearm stylus with real-time micro-tracking flutter, and breathing ambient halo glow.
+- **Aesthetic Mini Player:** Modern 14dp rounded floating pill with spinning vinyl playback glyph, smooth marquee text, and dual-tone gradient progress indicator.
 - **Refined Library Header:** Sleek minimalist branding with spinning vinyl glyph, track counter badge, instant search, and direct equalizer access.
-- **Floating Capsule Mini Player:** Modern 14dp rounded floating pill with border accent, rounded album art, smooth marquee text, and integrated progress bar.
 - **Pure Window Theme:** Zero redundant platform action bars or decor titles across every device and orientation.
-- **Aesthetic Color Themes:** Choose between 7 themes: *HighSpin Violet*, *Cyberpunk Neon*, *Emerald Groove*, *Sunset Horizon*, *Electric Ocean*, *Sakura Synth*, and *Golden Pulse*.
 - **Pure Black (AMOLED) Mode:** True `#000000` pitch-black backgrounds for OLED battery savings and maximum contrast.
-- **Spinning Vinyl Turntable Mode:** Interactive turntable with dynamic album art center label, physical micro-grooves, specular sheen reflections, moving tonearm stylus needle, and breathing ambient halo glow.
-- **Animated Real-Time Audio Visualizer:** High-framerate Compose Canvas visualizer with 3 selectable modes: *Dynamic Equalizer Bars with Peak Caps*, *Glowing Neon Waves*, and *Minimalist Pulse Dots*.
-- **Pulsing Backlight Halo:** Dynamic radial ambient glow matching the album art dominant color breathing in sync with playback.
 
 ### ⚡ Ultra-Lightweight & Fast
 - **Sub-3MB Footprint:** Aggressive R8 tree-shaking, dead code elimination, and resource shrinking reduced APK size by 86% (from 21.4 MB down to 2.9 MB).
@@ -88,7 +89,7 @@ com.lowspin.app/
 ├── ui/
 │   ├── components/   # AudioVisualizer, TurntableVinyl, SongInfoSheet, SongRow, QueueSheet, MiniPlayer
 │   ├── screens/      # Library, AlbumDetail, ArtistDetail, FolderDetail, Equalizer, Settings
-│   ├── settings/     # Appearance preferences & 7 aesthetic theme presets
+│   ├── settings/     # Appearance preferences & 10 aesthetic theme presets
 │   └── theme/        # Material3 dynamic dark & AMOLED pure black themes
 └── util/             # Millisecond formatting & time utilities
 ```
