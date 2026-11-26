@@ -61,6 +61,12 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE metadataEnriched = 0")
     suspend fun getPendingEnrichment(): List<SongEntity>
 
+    @Query("SELECT * FROM songs WHERE bpm = 0 OR musicalKey = ''")
+    suspend fun getPendingAudioAnalysis(): List<SongEntity>
+
+    @Query("UPDATE songs SET bpm = :bpm, musicalKey = :musicalKey WHERE id = :id")
+    suspend fun updateAudioAnalysis(id: Long, bpm: Int, musicalKey: String)
+
     @Query(
         """
         UPDATE songs
@@ -427,4 +433,39 @@ interface SongEqualizerDao {
 
     @Query("DELETE FROM song_equalizers WHERE songId = :songId")
     suspend fun delete(songId: Long)
+}
+
+@Dao
+interface PlayEventDao {
+
+    @Insert
+    suspend fun insert(event: PlayEventEntity)
+
+    @Query("SELECT SUM(durationListenedMs) FROM play_events")
+    fun observeTotalListenedMs(): Flow<Long?>
+
+    @Query("SELECT SUM(durationListenedMs) FROM play_events WHERE playedAt >= :sinceMs")
+    fun observeWeeklyListenedMs(sinceMs: Long): Flow<Long?>
+
+    @Query("SELECT COUNT(*) FROM play_events")
+    fun observeTotalPlayCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM play_events WHERE playedAt >= :sinceMs")
+    fun observeWeeklyPlayCount(sinceMs: Long): Flow<Int>
+
+    @Query(
+        """
+        SELECT s.artist AS artist,
+               COALESCE(MIN(s.id), 0) AS artSongId,
+               COUNT(pe.id) AS playCount,
+               COALESCE(SUM(pe.durationListenedMs), 0) AS totalDurationMs
+        FROM play_events pe
+        INNER JOIN songs s ON pe.songId = s.id
+        WHERE pe.playedAt >= :sinceMs
+        GROUP BY s.artist
+        ORDER BY totalDurationMs DESC, playCount DESC
+        LIMIT :limit
+        """
+    )
+    fun observeTopArtistsSince(sinceMs: Long, limit: Int = 10): Flow<List<ArtistPlayStat>>
 }

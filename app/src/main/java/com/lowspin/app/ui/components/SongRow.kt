@@ -113,13 +113,36 @@ fun SongRow(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(2.dp))
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (song.bpm > 0 || (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown")) {
+                    Spacer(Modifier.width(6.dp))
+                    val badge = buildString {
+                        if (song.bpm > 0) append("${song.bpm} BPM")
+                        if (song.bpm > 0 && song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") append(" · ")
+                        if (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") append(song.musicalKey)
+                    }
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
+            }
         }
         if (showDuration) {
             Spacer(Modifier.width(8.dp))

@@ -14,6 +14,7 @@ import com.lowspin.app.data.scanner.MediaStoreScanner
 import com.lowspin.app.media.EqualizerManager
 import com.lowspin.app.media.EqualizerSettings
 import com.lowspin.app.media.PlaybackController
+import com.lowspin.app.media.ScheduledPlaybackManager
 import com.lowspin.app.media.SleepTimerManager
 import com.lowspin.app.ui.settings.AppearanceSettings
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,7 @@ class AppContainer(context: Context) {
     private val id3Enricher = Id3Enricher(appContext, database.songDao())
 
     val musicRepository = MusicRepository(
+        context = appContext,
         database = database,
         scanner = mediaStoreScanner,
         enricher = id3Enricher,
@@ -59,6 +61,7 @@ class AppContainer(context: Context) {
     val equalizerManager = EqualizerManager(equalizerSettings, appContext)
 
     val sleepTimer = SleepTimerManager(appContext)
+    val scheduledPlayback = ScheduledPlaybackManager(appContext)
 
     val appearanceSettings = AppearanceSettings(appContext)
 

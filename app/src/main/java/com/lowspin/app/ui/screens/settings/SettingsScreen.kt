@@ -2,6 +2,7 @@ package com.lowspin.app.ui.screens.settings
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -34,9 +35,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
@@ -73,15 +76,18 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.di.AppContainer
 import com.lowspin.app.media.PlaybackService
+import com.lowspin.app.media.ScheduledPlaybackConfig
 import com.lowspin.app.ui.settings.HighSpinThemes
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LowspinAccentShades
+import com.lowspin.app.ui.settings.SwipeAction
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -118,6 +124,17 @@ fun SettingsScreen(
     val libraryTabsOrder by appearance.libraryTabsOrder.collectAsStateWithLifecycle()
     val hiddenLibraryTabs by appearance.hiddenLibraryTabs.collectAsStateWithLifecycle()
     val defaultLibraryTab by appearance.defaultLibraryTab.collectAsStateWithLifecycle()
+    val dynamicPalette by appearance.dynamicPalette.collectAsStateWithLifecycle()
+    val spectrumWallpaper by appearance.spectrumWallpaper.collectAsStateWithLifecycle()
+    val glassMiniPlayer by appearance.glassMiniPlayer.collectAsStateWithLifecycle()
+    val gaplessPlayback by appearance.gaplessPlayback.collectAsStateWithLifecycle()
+    val monoAudio by appearance.monoAudio.collectAsStateWithLifecycle()
+    val swipeLeftAction by appearance.swipeLeftAction.collectAsStateWithLifecycle()
+    val swipeRightAction by appearance.swipeRightAction.collectAsStateWithLifecycle()
+    val swipeUpAction by appearance.swipeUpAction.collectAsStateWithLifecycle()
+    val swipeDownAction by appearance.swipeDownAction.collectAsStateWithLifecycle()
+    val alarmConfig by container.scheduledPlayback.config.collectAsStateWithLifecycle()
+    val analysisProgress by container.musicRepository.audioAnalysisProgress.collectAsStateWithLifecycle()
 
     var showTabCustomizer by remember { mutableStateOf(false) }
 
@@ -236,6 +253,9 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(12.dp))
                 ToggleRow("Pure Black (AMOLED OLED)", pureBlack, appearance::setPureBlack)
+                ToggleRow("Dynamic Album Art UI Theme", dynamicPalette, appearance::setDynamicPalette)
+                ToggleRow("Frosted Glass Mini Player", glassMiniPlayer, appearance::setGlassMiniPlayer)
+                ToggleRow("Spectrum Wallpaper in Now Playing", spectrumWallpaper, appearance::setSpectrumWallpaper)
                 ToggleRow("Ambient Artwork Glow", ambientGlow, appearance::setAmbientGlow)
                 ToggleRow("Waveform Seekbar in Now Playing", waveformSeekbar, appearance::setWaveformSeekbar)
                 ToggleRow("Fluid Mesh Dynamic Lyrics", fluidMeshLyrics, appearance::setFluidMeshLyrics)
@@ -275,6 +295,8 @@ fun SettingsScreen(
             )
 
             SettingCard {
+                ToggleRow("Gapless Playback (Pre-buffered)", gaplessPlayback, appearance::setGaplessPlayback)
+                ToggleRow("Mono Audio Mix (Single-Earphone)", monoAudio, appearance::setMonoAudio)
                 ToggleRow("Volume Normalization & ReplayGain", volumeNormalization, appearance::setVolumeNormalization)
                 ToggleRow("Pause on Headset / Bluetooth Disconnect", pauseOnHeadsetDisconnect, appearance::setPauseOnHeadsetDisconnect)
                 ToggleRow("Auto-Resume on Bluetooth Connect", autoResumeBluetooth, appearance::setAutoResumeBluetooth)
@@ -288,6 +310,88 @@ fun SettingsScreen(
                     selected = crossfadeSec.toFloat(),
                     onSelect = { appearance.setCrossfadeSec(it.toInt()) }
                 )
+
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "Now Playing Custom Swipe Gestures",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = LowspinTextPrimary
+                )
+                Spacer(Modifier.height(6.dp))
+                SwipeActionRow("Swipe Left", swipeLeftAction, appearance::setSwipeLeftAction)
+                SwipeActionRow("Swipe Right", swipeRightAction, appearance::setSwipeRightAction)
+                SwipeActionRow("Swipe Up", swipeUpAction, appearance::setSwipeUpAction)
+                SwipeActionRow("Swipe Down", swipeDownAction, appearance::setSwipeDownAction)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Scheduled Morning Playback",
+                style = MaterialTheme.typography.titleMedium,
+                color = LowspinTextPrimary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            SettingCard {
+                ToggleRow(
+                    title = "Daily Music Alarm (${String.format(Locale.US, "%02d:%02d", alarmConfig.hour, alarmConfig.minute)})",
+                    checked = alarmConfig.enabled,
+                    onChange = { enabled ->
+                        container.scheduledPlayback.updateSchedule(enabled, alarmConfig.hour, alarmConfig.minute, alarmConfig.source)
+                    }
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Alarm wake-up time",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            TimePickerDialog(
+                                context,
+                                { _, hourOfDay, minute ->
+                                    container.scheduledPlayback.updateSchedule(true, hourOfDay, minute, alarmConfig.source)
+                                },
+                                alarmConfig.hour,
+                                alarmConfig.minute,
+                                true
+                            ).show()
+                        }
+                    ) {
+                        Icon(Icons.Rounded.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(String.format(Locale.US, "%02d:%02d", alarmConfig.hour, alarmConfig.minute))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        ScheduledPlaybackConfig.SOURCE_SHUFFLE_ALL to "Shuffle Library",
+                        ScheduledPlaybackConfig.SOURCE_LIKED to "Liked Songs",
+                        ScheduledPlaybackConfig.SOURCE_LAST_QUEUE to "Last Queue"
+                    ).forEach { (srcKey, label) ->
+                        val active = alarmConfig.source == srcKey
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (active) LowspinOnAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    container.scheduledPlayback.updateSchedule(alarmConfig.enabled, alarmConfig.hour, alarmConfig.minute, srcKey)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -432,6 +536,52 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text("Customize")
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "BPM & Musical Key Analysis",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LowspinTextPrimary
+                        )
+                        Text(
+                            text = if (analysisProgress != null) {
+                                "Analyzing ${analysisProgress!!.first}/${analysisProgress!!.second} tracks…"
+                            } else {
+                                "Detect tempo (BPM) & key for Smart Radio & Moods"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            container.musicRepository.startBackgroundAudioAnalysis(forceReanalyze = true)
+                            Toast.makeText(context, "BPM & Key analysis started", Toast.LENGTH_SHORT).show()
+                        },
+                        enabled = analysisProgress == null,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.GraphicEq,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (analysisProgress != null) "Running" else "Analyze")
                     }
                 }
             }
@@ -638,6 +788,41 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SwipeActionRow(
+    directionLabel: String,
+    currentAction: SwipeAction,
+    onSelect: (SwipeAction) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = directionLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = currentAction.label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                .clickable {
+                    val values = SwipeAction.entries
+                    val nextIdx = (values.indexOf(currentAction) + 1) % values.size
+                    onSelect(values[nextIdx])
+                }
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
 private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
@@ -806,6 +991,7 @@ private fun TabCustomizerDialog(
 
     val tabTitles = mapOf(
         "songs" to "Songs",
+        "recents" to "Recents",
         "albums" to "Albums",
         "artists" to "Artists",
         "folders" to "Folders",

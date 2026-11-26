@@ -25,13 +25,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideSource
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
@@ -91,6 +96,7 @@ import com.lowspin.app.ui.theme.LowspinTextPrimary
 @Composable
 fun LibraryScreen(
     songs: List<SongEntity>,
+    recentlyPlayed: List<SongEntity> = emptyList(),
     playlists: List<PlaylistSummary>,
     albums: List<AlbumSummary>,
     artists: List<ArtistSummary>,
@@ -113,6 +119,10 @@ fun LibraryScreen(
     onEqualizerClick: () -> Unit,
     onAbout: () -> Unit,
     onSettings: () -> Unit,
+    onDecadesClick: () -> Unit = {},
+    onMoodsClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
+    onDuplicatesClick: () -> Unit = {},
     onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)? = null
 ) {
     val scanning = scanState is ScanState.Scanning || scanState is ScanState.Enriching
@@ -147,6 +157,10 @@ fun LibraryScreen(
             onManageFolders = onManageFolders,
             onHiddenSongs = onHiddenSongs,
             onEqualizerClick = onEqualizerClick,
+            onDecadesClick = onDecadesClick,
+            onMoodsClick = onMoodsClick,
+            onStatsClick = onStatsClick,
+            onDuplicatesClick = onDuplicatesClick,
             onAbout = onAbout,
             onSettings = onSettings
         )
@@ -173,15 +187,27 @@ fun LibraryScreen(
                     onSongOptions = onSongOptions,
                     onRefresh = onRefresh
                 )
+                "recents" -> RecentsTab(
+                    recentlyPlayed = recentlyPlayed,
+                    currentSongId = currentSongId,
+                    onSongClick = onSongClick,
+                    onPlayQueue = onPlayQueue,
+                    onSongOptions = onSongOptions
+                )
                 "playlists" -> PlaylistsTab(
                     playlists = playlists,
                     songs = songs,
+                    recentlyPlayed = recentlyPlayed,
                     likedCount = likedCount,
                     onSongClick = onSongClick,
                     onPlayQueue = onPlayQueue,
                     onPlaylistClick = onPlaylistClick,
                     onLikedClick = onLikedClick,
-                    onCreatePlaylist = onCreatePlaylist
+                    onCreatePlaylist = onCreatePlaylist,
+                    onDecadesClick = onDecadesClick,
+                    onMoodsClick = onMoodsClick,
+                    onStatsClick = onStatsClick,
+                    onDuplicatesClick = onDuplicatesClick
                 )
                 "albums" -> AlbumsTab(
                     albums = albums,
@@ -219,6 +245,10 @@ private fun LibraryHeader(
     onManageFolders: () -> Unit,
     onHiddenSongs: () -> Unit,
     onEqualizerClick: () -> Unit,
+    onDecadesClick: () -> Unit,
+    onMoodsClick: () -> Unit,
+    onStatsClick: () -> Unit,
+    onDuplicatesClick: () -> Unit,
     onAbout: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -344,6 +374,62 @@ private fun LibraryHeader(
                     }
                 )
                 DropdownMenuItem(
+                    text = { Text("Mood Board", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onMoodsClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Decade Browser", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onDecadesClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Listening Stats", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.BarChart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onStatsClick()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Duplicate Finder", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onDuplicatesClick()
+                    }
+                )
+                DropdownMenuItem(
                     text = { Text("About HighSpin", color = LowspinTextPrimary) },
                     leadingIcon = {
                         Icon(
@@ -384,6 +470,7 @@ private fun LibraryTabs(
 ) {
     val tabTitles = mapOf(
         "songs" to "Songs",
+        "recents" to "Recents",
         "playlists" to "Playlists",
         "albums" to "Albums",
         "artists" to "Artists",
@@ -476,7 +563,7 @@ private fun SongsTab(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 20.dp)
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)
                 ) {
                     items(
                         items = songs,
@@ -489,6 +576,41 @@ private fun SongsTab(
                             onClick = { onSongClick(song) },
                             onMoreClick = { onSongOptions(song) },
                             onLongClick = { onSongOptions(song) }
+                        )
+                    }
+                }
+
+                // #16 Scroll-to-Current Song locate pill button
+                val currentIdx = remember(songs, currentSongId) {
+                    if (currentSongId == null) -1 else songs.indexOfFirst { it.id == currentSongId }
+                }
+                if (currentIdx >= 0) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 36.dp, bottom = 96.dp)
+                            .shadow(8.dp, RoundedCornerShape(24.dp))
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                            .pressScaleClickable(onClick = {
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(currentIdx)
+                                }
+                            })
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MyLocation,
+                            contentDescription = "Locate current song",
+                            tint = LowspinOnAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = "Playing",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = LowspinOnAccent
                         )
                     }
                 }
@@ -562,24 +684,117 @@ private fun SongsTab(
 }
 
 @Composable
+private fun RecentsTab(
+    recentlyPlayed: List<SongEntity>,
+    currentSongId: Long?,
+    onSongClick: (SongEntity) -> Unit,
+    onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)?,
+    onSongOptions: (SongEntity) -> Unit
+) {
+    if (recentlyPlayed.isEmpty()) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Rounded.History,
+                    contentDescription = null,
+                    tint = LowspinTextMuted,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "No recently played songs yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)
+        ) {
+            items(
+                items = recentlyPlayed,
+                key = { "recent_tab_${it.id}" },
+                contentType = { "song" }
+            ) { song ->
+                SongRow(
+                    song = song,
+                    isCurrent = song.id == currentSongId,
+                    onClick = {
+                        val idx = recentlyPlayed.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                        if (onPlayQueue != null) {
+                            onPlayQueue(recentlyPlayed, idx, "Recently Played")
+                        } else {
+                            onSongClick(song)
+                        }
+                    },
+                    onMoreClick = { onSongOptions(song) },
+                    onLongClick = { onSongOptions(song) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlaylistsTab(
     playlists: List<PlaylistSummary>,
     songs: List<SongEntity>,
+    recentlyPlayed: List<SongEntity>,
     likedCount: Int,
     onSongClick: (SongEntity) -> Unit,
     onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)?,
     onPlaylistClick: (Long) -> Unit,
     onLikedClick: () -> Unit,
-    onCreatePlaylist: () -> Unit
+    onCreatePlaylist: () -> Unit,
+    onDecadesClick: () -> Unit,
+    onMoodsClick: () -> Unit,
+    onStatsClick: () -> Unit,
+    onDuplicatesClick: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 20.dp)
+        contentPadding = PaddingValues(bottom = 96.dp)
     ) {
+        item(key = "explore_strip") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ExploreChip("Mood Board", Icons.Rounded.AutoAwesome, onMoodsClick)
+                ExploreChip("Decades", Icons.Rounded.Schedule, onDecadesClick)
+                ExploreChip("Stats", Icons.Rounded.BarChart, onStatsClick)
+                ExploreChip("Duplicates", Icons.Rounded.ContentCopy, onDuplicatesClick)
+            }
+        }
         item(key = "liked", contentType = "liked") {
             LikedSongsCard(
                 songCount = likedCount,
                 onClick = onLikedClick,
+                modifier = Modifier.animateItem()
+            )
+        }
+        item(key = "recently_played_smart", contentType = "recent_played") {
+            SmartPlaylistCard(
+                title = "Recently Played",
+                subtitle = if (recentlyPlayed.isEmpty()) "No playback history yet" else "${recentlyPlayed.size} recent tracks",
+                icon = Icons.Rounded.History,
+                gradientColors = listOf(Color(0xFF7B2CBF), Color(0xFFFF2A85)),
+                onClick = {
+                    if (recentlyPlayed.isNotEmpty()) {
+                        if (onPlayQueue != null) {
+                            onPlayQueue(recentlyPlayed, 0, "Recently Played")
+                        } else {
+                            onSongClick(recentlyPlayed.first())
+                        }
+                    } else if (songs.isNotEmpty()) {
+                        onSongClick(songs.first())
+                    }
+                },
                 modifier = Modifier.animateItem()
             )
         }
@@ -669,6 +884,35 @@ private fun PlaylistsTab(
 }
 
 @Composable
+private fun ExploreChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+            .pressScaleClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = LowspinTextPrimary
+        )
+    }
+}
+
+@Composable
 private fun SmartPlaylistCard(
     title: String,
     subtitle: String,
@@ -732,7 +976,7 @@ private fun AlbumsTab(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 20.dp)
+            contentPadding = PaddingValues(bottom = 96.dp)
         ) {
             items(items = albums, key = { "${it.albumId}_${it.album}" }) { album ->
                 Row(
@@ -807,7 +1051,7 @@ private fun ArtistsTab(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 20.dp)
+            contentPadding = PaddingValues(bottom = 96.dp)
         ) {
             items(items = artists, key = { it.artist }) { artist ->
                 Row(
@@ -883,7 +1127,7 @@ private fun FoldersTab(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 20.dp)
+            contentPadding = PaddingValues(bottom = 96.dp)
         ) {
             items(items = folders, key = { "${it.folderPath}_${it.folderName}" }) { folder ->
                 Row(

@@ -13,6 +13,21 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    fun migration7to8_versionNumbersCorrect_andPlayEventEntity() {
+        assertEquals(7, LowspinDatabase.MIGRATION_7_8.startVersion)
+        assertEquals(8, LowspinDatabase.MIGRATION_7_8.endVersion)
+
+        val event = PlayEventEntity(
+            id = 1L,
+            songId = 42L,
+            playedAt = 1700000000L,
+            durationListenedMs = 180_000L
+        )
+        assertEquals(42L, event.songId)
+        assertEquals(180_000L, event.durationListenedMs)
+    }
+
+    @Test
     fun songEqualizerEntity_instantiation() {
         val entity = SongEqualizerEntity(
             songId = 42L,

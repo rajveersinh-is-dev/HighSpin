@@ -162,6 +162,25 @@ val LocalAppearance = staticCompositionLocalOf<AppearanceSettings> {
 
 val LocalListStyle = staticCompositionLocalOf { LowspinListStyle() }
 
+/** Swipe gesture actions assignable to Now Playing screen directions. */
+enum class SwipeAction(val id: String, val label: String) {
+    NONE("none", "Off"),
+    DISMISS("dismiss", "Dismiss Player"),
+    NEXT("next", "Next Track"),
+    PREVIOUS("previous", "Previous Track"),
+    SEEK_FORWARD_10("seek_fwd_10", "Seek +10s"),
+    SEEK_BACK_10("seek_back_10", "Seek -10s"),
+    TOGGLE_LIKE("toggle_like", "Toggle Like"),
+    CYCLE_SPEED("cycle_speed", "Cycle Speed"),
+    TOGGLE_LYRICS("toggle_lyrics", "Toggle Lyrics"),
+    OPEN_QUEUE("open_queue", "Open Queue");
+
+    companion object {
+        fun fromId(id: String?): SwipeAction =
+            entries.firstOrNull { it.id == id } ?: NONE
+    }
+}
+
 /**
  * Appearance and accessibility preferences. Stored locally, no permissions.
  */
@@ -262,6 +281,30 @@ class AppearanceSettings(context: Context) {
     private val _fluidMeshLyrics = MutableStateFlow(prefs.getBoolean(KEY_FLUID_MESH_LYRICS, true))
     val fluidMeshLyrics: StateFlow<Boolean> = _fluidMeshLyrics.asStateFlow()
 
+    private val _gaplessPlayback = MutableStateFlow(prefs.getBoolean(KEY_GAPLESS_PLAYBACK, true))
+    val gaplessPlayback: StateFlow<Boolean> = _gaplessPlayback.asStateFlow()
+
+    private val _monoAudio = MutableStateFlow(prefs.getBoolean(KEY_MONO_AUDIO, false))
+    val monoAudio: StateFlow<Boolean> = _monoAudio.asStateFlow()
+
+    private val _spectrumWallpaper = MutableStateFlow(prefs.getBoolean(KEY_SPECTRUM_WALLPAPER, false))
+    val spectrumWallpaper: StateFlow<Boolean> = _spectrumWallpaper.asStateFlow()
+
+    private val _glassMiniPlayer = MutableStateFlow(prefs.getBoolean(KEY_GLASS_MINI_PLAYER, true))
+    val glassMiniPlayer: StateFlow<Boolean> = _glassMiniPlayer.asStateFlow()
+
+    private val _swipeLeftAction = MutableStateFlow(SwipeAction.fromId(prefs.getString(KEY_SWIPE_LEFT, SwipeAction.NEXT.id)))
+    val swipeLeftAction: StateFlow<SwipeAction> = _swipeLeftAction.asStateFlow()
+
+    private val _swipeRightAction = MutableStateFlow(SwipeAction.fromId(prefs.getString(KEY_SWIPE_RIGHT, SwipeAction.PREVIOUS.id)))
+    val swipeRightAction: StateFlow<SwipeAction> = _swipeRightAction.asStateFlow()
+
+    private val _swipeUpAction = MutableStateFlow(SwipeAction.fromId(prefs.getString(KEY_SWIPE_UP, SwipeAction.OPEN_QUEUE.id)))
+    val swipeUpAction: StateFlow<SwipeAction> = _swipeUpAction.asStateFlow()
+
+    private val _swipeDownAction = MutableStateFlow(SwipeAction.fromId(prefs.getString(KEY_SWIPE_DOWN, SwipeAction.DISMISS.id)))
+    val swipeDownAction: StateFlow<SwipeAction> = _swipeDownAction.asStateFlow()
+
     private val _libraryTabsOrder = MutableStateFlow(loadTabsOrder())
     val libraryTabsOrder: StateFlow<List<String>> = _libraryTabsOrder.asStateFlow()
 
@@ -299,6 +342,14 @@ class AppearanceSettings(context: Context) {
             KEY_AUTO_RESUME_BLUETOOTH -> _autoResumeBluetooth.value = prefs.getBoolean(KEY_AUTO_RESUME_BLUETOOTH, false)
             KEY_WAVEFORM_SEEKBAR -> _waveformSeekbar.value = prefs.getBoolean(KEY_WAVEFORM_SEEKBAR, true)
             KEY_FLUID_MESH_LYRICS -> _fluidMeshLyrics.value = prefs.getBoolean(KEY_FLUID_MESH_LYRICS, true)
+            KEY_GAPLESS_PLAYBACK -> _gaplessPlayback.value = prefs.getBoolean(KEY_GAPLESS_PLAYBACK, true)
+            KEY_MONO_AUDIO -> _monoAudio.value = prefs.getBoolean(KEY_MONO_AUDIO, false)
+            KEY_SPECTRUM_WALLPAPER -> _spectrumWallpaper.value = prefs.getBoolean(KEY_SPECTRUM_WALLPAPER, false)
+            KEY_GLASS_MINI_PLAYER -> _glassMiniPlayer.value = prefs.getBoolean(KEY_GLASS_MINI_PLAYER, true)
+            KEY_SWIPE_LEFT -> _swipeLeftAction.value = SwipeAction.fromId(prefs.getString(KEY_SWIPE_LEFT, SwipeAction.NEXT.id))
+            KEY_SWIPE_RIGHT -> _swipeRightAction.value = SwipeAction.fromId(prefs.getString(KEY_SWIPE_RIGHT, SwipeAction.PREVIOUS.id))
+            KEY_SWIPE_UP -> _swipeUpAction.value = SwipeAction.fromId(prefs.getString(KEY_SWIPE_UP, SwipeAction.OPEN_QUEUE.id))
+            KEY_SWIPE_DOWN -> _swipeDownAction.value = SwipeAction.fromId(prefs.getString(KEY_SWIPE_DOWN, SwipeAction.DISMISS.id))
             KEY_LIBRARY_TABS_ORDER -> _libraryTabsOrder.value = loadTabsOrder()
             KEY_HIDDEN_LIBRARY_TABS -> _hiddenLibraryTabs.value = loadHiddenTabs()
             KEY_DEFAULT_LIBRARY_TAB -> _defaultLibraryTab.value = prefs.getString(KEY_DEFAULT_LIBRARY_TAB, "songs") ?: "songs"
@@ -393,6 +444,30 @@ class AppearanceSettings(context: Context) {
     fun setFluidMeshLyrics(value: Boolean) = store { putBoolean(KEY_FLUID_MESH_LYRICS, value) }
         .also { _fluidMeshLyrics.value = value }
 
+    fun setGaplessPlayback(value: Boolean) = store { putBoolean(KEY_GAPLESS_PLAYBACK, value) }
+        .also { _gaplessPlayback.value = value }
+
+    fun setMonoAudio(value: Boolean) = store { putBoolean(KEY_MONO_AUDIO, value) }
+        .also { _monoAudio.value = value }
+
+    fun setSpectrumWallpaper(value: Boolean) = store { putBoolean(KEY_SPECTRUM_WALLPAPER, value) }
+        .also { _spectrumWallpaper.value = value }
+
+    fun setGlassMiniPlayer(value: Boolean) = store { putBoolean(KEY_GLASS_MINI_PLAYER, value) }
+        .also { _glassMiniPlayer.value = value }
+
+    fun setSwipeLeftAction(action: SwipeAction) = store { putString(KEY_SWIPE_LEFT, action.id) }
+        .also { _swipeLeftAction.value = action }
+
+    fun setSwipeRightAction(action: SwipeAction) = store { putString(KEY_SWIPE_RIGHT, action.id) }
+        .also { _swipeRightAction.value = action }
+
+    fun setSwipeUpAction(action: SwipeAction) = store { putString(KEY_SWIPE_UP, action.id) }
+        .also { _swipeUpAction.value = action }
+
+    fun setSwipeDownAction(action: SwipeAction) = store { putString(KEY_SWIPE_DOWN, action.id) }
+        .also { _swipeDownAction.value = action }
+
     fun setLibraryTabsOrder(order: List<String>) {
         val serialized = order.joinToString(",")
         store { putString(KEY_LIBRARY_TABS_ORDER, serialized) }
@@ -415,7 +490,7 @@ class AppearanceSettings(context: Context) {
     }
 
     companion object {
-        val DEFAULT_LIBRARY_TABS = listOf("songs", "albums", "artists", "folders", "playlists")
+        val DEFAULT_LIBRARY_TABS = listOf("songs", "recents", "albums", "artists", "folders", "playlists")
 
         const val KEY_THEME = "theme_preset"
         const val KEY_ACCENT = "accent"
@@ -443,6 +518,14 @@ class AppearanceSettings(context: Context) {
         const val KEY_AUTO_RESUME_BLUETOOTH = "auto_resume_bluetooth"
         const val KEY_WAVEFORM_SEEKBAR = "waveform_seekbar"
         const val KEY_FLUID_MESH_LYRICS = "fluid_mesh_lyrics"
+        const val KEY_GAPLESS_PLAYBACK = "gapless_playback"
+        const val KEY_MONO_AUDIO = "mono_audio"
+        const val KEY_SPECTRUM_WALLPAPER = "spectrum_wallpaper"
+        const val KEY_GLASS_MINI_PLAYER = "glass_mini_player"
+        const val KEY_SWIPE_LEFT = "swipe_left_action"
+        const val KEY_SWIPE_RIGHT = "swipe_right_action"
+        const val KEY_SWIPE_UP = "swipe_up_action"
+        const val KEY_SWIPE_DOWN = "swipe_down_action"
         const val KEY_LIBRARY_TABS_ORDER = "library_tabs_order"
         const val KEY_HIDDEN_LIBRARY_TABS = "hidden_library_tabs"
         const val KEY_DEFAULT_LIBRARY_TAB = "default_library_tab"

@@ -10,6 +10,7 @@ import androidx.media3.session.SessionToken
 import androidx.room.withTransaction
 import com.lowspin.app.data.art.AlbumArtRepository
 import com.lowspin.app.data.db.LowspinDatabase
+import com.lowspin.app.data.db.PlayEventEntity
 import com.lowspin.app.data.db.PlaybackStateEntity
 import com.lowspin.app.data.db.QueueItemEntity
 import com.lowspin.app.data.db.SongEntity
@@ -254,10 +255,25 @@ class PlaybackController(
 
             delay(7_000)
             if (isCurrent(id) && controller?.isPlaying == true) {
-                database.songDao().recordPlay(id, System.currentTimeMillis())
+                val playTimestamp = System.currentTimeMillis()
+                val songDuration = songCache[id]?.durationMs?.coerceAtLeast(10_000L) ?: 30_000L
+                val estimatedListenMs = minOf(songDuration, 180_000L)
+                database.songDao().recordPlay(id, playTimestamp)
+                database.playEventDao().insert(
+                    PlayEventEntity(
+                        songId = id,
+                        playedAt = playTimestamp,
+                        durationListenedMs = estimatedListenMs
+                    )
+                )
                 songCache[id]?.let { songCache[id] = it.copy(playCount = it.playCount + 1) }
             }
         }
+    }
+
+    fun startSmartRadio(seed: SongEntity, library: List<SongEntity>) {
+        val radioQueue = SmartRadioEngine.buildRadioQueue(seed = seed, library = library)
+        playQueue(radioQueue, 0, "Smart Radio • ${seed.title}")
     }
 
     private fun isCurrent(songId: Long): Boolean =

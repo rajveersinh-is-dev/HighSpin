@@ -19,10 +19,18 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import com.lowspin.app.MainActivity
@@ -114,6 +122,8 @@ class PlaybackService : MediaSessionService() {
     private var loopJob: Job? = null
     private var lastSeekToLoopStart = 0L
     private var noisyReceiver: BroadcastReceiver? = null
+    private val monoMixProcessor = MonoMixAudioProcessor()
+    private var alarmFadeActive = false
 
     private val container: com.lowspin.app.di.AppContainer
         get() = (application as LowspinApplication).container
@@ -151,11 +161,34 @@ class PlaybackService : MediaSessionService() {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
 
-        player = ExoPlayer.Builder(this)
+        monoMixProcessor.enabled = container.appearanceSettings.monoAudio.value
+
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(monoMixProcessor))
+                    .build()
+            }
+        }
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, 50_000, 250, 1_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        player = ExoPlayer.Builder(this, renderersFactory)
+            .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+        player.pauseAtEndOfMediaItems = !container.appearanceSettings.gaplessPlayback.value
 
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -258,6 +291,7 @@ class PlaybackService : MediaSessionService() {
         startPersistLoop()
         startLiveNotificationObserver()
         startGestureObserver()
+        startAudioBehaviorObserver()
         registerHeadsetAndBluetoothReceiver()
         startLoopChecker()
         startLoopObserver()
@@ -293,8 +327,67 @@ class PlaybackService : MediaSessionService() {
                     player.seekToPreviousMediaItem()
                 }
             }
+            ScheduledPlaybackManager.ACTION_ALARM_TRIGGER -> {
+                val source = intent.getStringExtra(ScheduledPlaybackManager.EXTRA_ALARM_SOURCE)
+                    ?: ScheduledPlaybackConfig.SOURCE_SHUFFLE_ALL
+                triggerScheduledPlayback(source)
+            }
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun startAudioBehaviorObserver() {
+        val appearance = container.appearanceSettings
+        scope.launch {
+            appearance.monoAudio.collect { enabled ->
+                monoMixProcessor.enabled = enabled
+            }
+        }
+        scope.launch {
+            appearance.gaplessPlayback.collect { gapless ->
+                if (::player.isInitialized) {
+                    player.pauseAtEndOfMediaItems = !gapless
+                }
+            }
+        }
+    }
+
+    private fun triggerScheduledPlayback(source: String) {
+        scope.launch {
+            if (!::player.isInitialized) return@launch
+            val db = container.database
+            val allSongs = db.songDao().getAll()
+            if (allSongs.isEmpty()) return@launch
+
+            val queue = when (source) {
+                ScheduledPlaybackConfig.SOURCE_LIKED -> {
+                    val liked = allSongs.filter { it.isLiked }
+                    if (liked.isNotEmpty()) liked.shuffled() else allSongs.shuffled()
+                }
+                ScheduledPlaybackConfig.SOURCE_LAST_QUEUE -> {
+                    val qIds = db.queueDao().getAll().map { it.songId }
+                    val map = allSongs.associateBy { it.id }
+                    val restored = qIds.mapNotNull { map[it] }
+                    if (restored.isNotEmpty()) restored else allSongs.shuffled()
+                }
+                else -> allSongs.shuffled()
+            }
+
+            player.setMediaItems(queue.map { it.toMediaItem() }, 0, 0L)
+            alarmFadeActive = true
+            player.volume = 0.15f
+            player.prepare()
+            player.play()
+
+            val steps = 20
+            for (step in 1..steps) {
+                delay(400L)
+                if (!player.isPlaying) break
+                player.volume = (0.15f + 0.85f * (step.toFloat() / steps)).coerceIn(0.15f, 1f)
+            }
+            player.volume = 1f
+            alarmFadeActive = false
+        }
     }
 
     override fun onDestroy() {
@@ -340,6 +433,27 @@ class PlaybackService : MediaSessionService() {
                         if (now - lastSeekToLoopStart > 250L) {
                             lastSeekToLoopStart = now
                             player.seekTo(start)
+                        }
+                    }
+
+                    // Crossfade volume ramp near end of track when sleep timer & alarm fade aren't running
+                    val crossfadeMs = container.appearanceSettings.crossfadeSec.value * 1000L
+                    if (crossfadeMs > 0L &&
+                        container.sleepTimer.endsAt.value <= 0L &&
+                        !alarmFadeActive &&
+                        player.repeatMode != Player.REPEAT_MODE_ONE &&
+                        player.hasNextMediaItem()
+                    ) {
+                        val dur = player.duration
+                        val pos = player.currentPosition
+                        if (dur > crossfadeMs * 2L) {
+                            val remaining = (dur - pos).coerceAtLeast(0L)
+                            val targetVol = when {
+                                remaining < crossfadeMs -> (remaining.toFloat() / crossfadeMs).coerceIn(0.05f, 1f)
+                                pos < crossfadeMs / 2L -> (pos.toFloat() / (crossfadeMs / 2f)).coerceIn(0.2f, 1f)
+                                else -> 1f
+                            }
+                            player.volume = targetVol
                         }
                     }
                 }
@@ -775,6 +889,37 @@ class PlaybackService : MediaSessionService() {
             return super.onMediaButtonEvent(session, controllerInfo, intent)
         }
 
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val baseResult = super.onConnect(session, controller)
+            val sessionCommands = baseResult.availableSessionCommands
+                .buildUpon()
+                .add(SessionCommand(CUSTOM_CMD_SHUFFLE, android.os.Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommands)
+                .setAvailablePlayerCommands(baseResult.availablePlayerCommands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: android.os.Bundle
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == CUSTOM_CMD_SHUFFLE && ::player.isInitialized) {
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
+                updateLockScreenCustomButtons()
+                return com.google.common.util.concurrent.Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_SUCCESS)
+                )
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
+        }
+
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controllerInfo: MediaSession.ControllerInfo
@@ -899,5 +1044,28 @@ class PlaybackService : MediaSessionService() {
                 fwkSession.setExtras(sessionExtras)
             }
         }
+
+        updateLockScreenCustomButtons()
+        HighSpinWidgetProvider.pushUpdate(
+            context = this,
+            title = title,
+            artist = artist,
+            isPlaying = isPlaying,
+            songId = songId
+        )
     }
+
+    private fun updateLockScreenCustomButtons() {
+        val session = mediaSession ?: return
+        if (!::player.isInitialized) return
+        val shuffleOn = player.shuffleModeEnabled
+        val shuffleBtn = CommandButton.Builder()
+            .setDisplayName(if (shuffleOn) "Shuffle On" else "Shuffle Off")
+            .setSessionCommand(SessionCommand(CUSTOM_CMD_SHUFFLE, android.os.Bundle.EMPTY))
+            .setIconResId(R.drawable.ic_stat_vinyl)
+            .build()
+        runCatching { session.setCustomLayout(ImmutableList.of(shuffleBtn)) }
+    }
+
+    private val CUSTOM_CMD_SHUFFLE = "com.lowspin.app.cmd.TOGGLE_SHUFFLE"
 }

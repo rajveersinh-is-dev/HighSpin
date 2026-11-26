@@ -17,27 +17,34 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +70,8 @@ fun QueueSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val queueListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     var showSaveDialog by remember { mutableStateOf(false) }
     val queueSongs = remember(state.queueSize, state.currentSong, state.currentMediaItemIndex) {
         playbackController.getQueueSongs()
@@ -116,6 +125,19 @@ fun QueueSheet(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (currentSong != null) {
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch { queueListState.animateScrollToItem(0) }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MyLocation,
+                                contentDescription = "Locate Current Track",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     if (queueSongs.isNotEmpty() && onSaveQueueAsPlaylist != null) {
                         IconButton(
                             onClick = { showSaveDialog = true },
@@ -152,6 +174,7 @@ fun QueueSheet(
             }
 
             LazyColumn(
+                state = queueListState,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
@@ -263,63 +286,102 @@ fun QueueSheet(
                             )
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isDragging) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-                                .zIndex(if (isDragging) 1f else 0f)
-                                .padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AlbumArtImage(
-                                songId = song.id,
-                                seed = song.album.ifBlank { song.title },
-                                modifier = Modifier.size(44.dp),
-                                sizePx = 128
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    text = song.title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = LowspinTextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = song.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(
-                                onClick = {
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.EndToStart) {
                                     playbackController.removeQueueItem(realIndex)
-                                    localUpcoming = localUpcoming.toMutableList().apply { removeAt(index) }
-                                },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.DeleteOutline,
-                                    contentDescription = "Remove",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                    localUpcoming = localUpcoming.toMutableList().apply {
+                                        if (index in indices) removeAt(index)
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
                             }
-                            Box(
-                                modifier = dragModifier.size(36.dp),
-                                contentAlignment = Alignment.Center
+                        )
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
+                                        .padding(horizontal = 18.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = "Swipe to remove",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(64.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isDragging) MaterialTheme.colorScheme.surfaceVariant
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                    )
+                                    .zIndex(if (isDragging) 1f else 0f)
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.DragHandle,
-                                    contentDescription = "Reorder",
-                                    tint = LowspinTextMuted,
-                                    modifier = Modifier.size(20.dp)
+                                AlbumArtImage(
+                                    songId = song.id,
+                                    seed = song.album.ifBlank { song.title },
+                                    modifier = Modifier.size(44.dp),
+                                    sizePx = 128
                                 )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        text = song.title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = LowspinTextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        playbackController.removeQueueItem(realIndex)
+                                        localUpcoming = localUpcoming.toMutableList().apply { removeAt(index) }
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = "Remove",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Box(
+                                    modifier = dragModifier.size(36.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DragHandle,
+                                        contentDescription = "Reorder",
+                                        tint = LowspinTextMuted,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }

@@ -39,3 +39,10 @@ data class PlaylistSummary(
     val customCoverUri: String? = null,
     val gradientColorIndex: Int? = null
 )
+
+data class ArtistPlayStat(
+    val artist: String,
+    val artSongId: Long,
+    val playCount: Int,
+    val totalDurationMs: Long
+)

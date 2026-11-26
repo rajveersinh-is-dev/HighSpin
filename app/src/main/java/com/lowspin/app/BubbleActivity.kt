@@ -146,7 +146,7 @@ class BubbleActivity : ComponentActivity() {
                 LocalAppearance provides appearance,
                 LocalAlbumArtRepository provides container.albumArtRepository
             ) {
-                LowspinTheme {
+                LowspinTheme(dominantColor = playerState.dominantColor) {
                     CompositionLocalProvider(
                         LocalDensity provides Density(
                             density = density.density,

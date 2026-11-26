@@ -41,7 +41,9 @@ data class SongEntity(
     val metadataEnriched: Boolean = false,
     val lastSeenScan: Long = 0L,
     /** Stable folder + filename key so a hidden file stays hidden after a rescan. */
-    val matchKey: String = ""
+    val matchKey: String = "",
+    val bpm: Int = 0,
+    val musicalKey: String = ""
 )
 
 @Entity(tableName = "playlists")
@@ -156,6 +158,17 @@ data class SongEqualizerEntity(
     val loudnessGain: Int,
     val customBands: String?,
     val updatedAt: Long
+)
+
+@Entity(
+    tableName = "play_events",
+    indices = [Index("songId"), Index("playedAt")]
+)
+data class PlayEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val songId: Long,
+    val playedAt: Long,
+    val durationListenedMs: Long
 )
 
 

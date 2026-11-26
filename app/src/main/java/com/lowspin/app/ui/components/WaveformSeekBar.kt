@@ -1,9 +1,14 @@
 package com.lowspin.app.ui.components
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +37,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lowspin.app.util.formatDuration
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 private const val BAR_COUNT = 52
@@ -60,7 +70,12 @@ fun WaveformSeekBar(
 
     var dragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(0f) }
+    var pointerX by remember { mutableFloatStateOf(0f) }
+    var widthPx by remember { mutableIntStateOf(1) }
     var lastHapticBarIndex by remember { mutableIntStateOf(-1) }
+    val density = LocalDensity.current
+    val tooltipHalfW = with(density) { 28.dp.toPx() }
+    val tooltipYOffset = with(density) { (-38).dp.roundToPx() }
 
     LaunchedEffect(positionMs, dragging) {
         if (!dragging) {
@@ -94,44 +109,67 @@ fun WaveformSeekBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
+                .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
                 .pointerInput(duration, songId) {
-                    detectTapGestures { offset ->
-                        val ratio = (offset.x / size.width).coerceIn(0f, 1f)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val w = size.width.coerceAtLeast(1)
+                        pointerX = down.position.x.coerceIn(0f, w.toFloat())
+                        dragProgress = (pointerX / w).coerceIn(0f, 1f)
+                        dragging = true
+                        lastHapticBarIndex = (dragProgress * BAR_COUNT).toInt()
                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        onSeek((ratio * duration).toLong())
-                    }
-                }
-                .pointerInput(duration, songId) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            dragging = true
-                            dragProgress = (offset.x / size.width).coerceIn(0f, 1f)
-                            lastHapticBarIndex = (dragProgress * BAR_COUNT).toInt()
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        },
-                        onDragEnd = {
-                            val seekTarget = (dragProgress * duration).toLong()
-                            onSeek(seekTarget)
-                            dragging = false
-                            lastHapticBarIndex = -1
-                        },
-                        onDragCancel = {
-                            dragging = false
-                            lastHapticBarIndex = -1
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val ratio = (change.position.x / size.width).coerceIn(0f, 1f)
+
+                        var cancelled = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                change.consume()
+                                break
+                            }
+                            pointerX = change.position.x.coerceIn(0f, w.toFloat())
+                            val ratio = (pointerX / w).coerceIn(0f, 1f)
                             dragProgress = ratio
                             val currentBar = (ratio * BAR_COUNT).toInt()
                             if (currentBar != lastHapticBarIndex) {
                                 lastHapticBarIndex = currentBar
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             }
+                            change.consume()
                         }
-                    )
+                        if (!cancelled) {
+                            onSeek((dragProgress * duration).toLong())
+                        }
+                        dragging = false
+                        lastHapticBarIndex = -1
+                    }
                 }
         ) {
+            // Floating finger-following time preview tooltip on hold/scrub
+            androidx.compose.animation.AnimatedVisibility(
+                visible = dragging,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.offset {
+                    val clampedX = (pointerX - tooltipHalfW).coerceIn(0f, (widthPx - tooltipHalfW * 2).coerceAtLeast(0f))
+                    IntOffset(clampedX.roundToInt(), tooltipYOffset)
+                }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, primaryColor.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = formatDuration((dragProgress * duration).toLong()),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = primaryColor
+                    )
+                }
+            }
             Canvas(modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 val totalWidth = size.width
                 val totalHeight = size.height

@@ -17,9 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         RecentSearchEntity::class,
         ExcludedFolderEntity::class,
         HiddenSongEntity::class,
-        SongEqualizerEntity::class
+        SongEqualizerEntity::class,
+        PlayEventEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class LowspinDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class LowspinDatabase : RoomDatabase() {
     abstract fun excludedFolderDao(): ExcludedFolderDao
     abstract fun hiddenSongDao(): HiddenSongDao
     abstract fun songEqualizerDao(): SongEqualizerDao
+    abstract fun playEventDao(): PlayEventDao
 
     companion object {
         @Volatile
@@ -149,6 +151,25 @@ abstract class LowspinDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `bpm` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `songs` ADD COLUMN `musicalKey` TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `play_events` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `songId` INTEGER NOT NULL,
+                        `playedAt` INTEGER NOT NULL,
+                        `durationListenedMs` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_play_events_songId` ON `play_events` (`songId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_play_events_playedAt` ON `play_events` (`playedAt`)")
+            }
+        }
+
         fun get(context: Context): LowspinDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -162,7 +183,8 @@ abstract class LowspinDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .build()
                     .also { instance = it }

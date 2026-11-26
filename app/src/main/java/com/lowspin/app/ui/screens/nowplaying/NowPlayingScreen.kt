@@ -4,14 +4,22 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,15 +49,15 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DirectionsCar
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Schedule
@@ -57,6 +65,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,12 +79,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -93,18 +103,26 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.data.lyrics.Lyrics
+import com.lowspin.app.media.EqualizerManager
+import com.lowspin.app.media.EqualizerSettings
 import com.lowspin.app.media.PlayerUiState
 import com.lowspin.app.ui.components.AlbumArtImage
 import com.lowspin.app.ui.components.AudioVisualizer
+import com.lowspin.app.ui.components.BassBoostDial
 import com.lowspin.app.ui.components.FluidMeshBackground
+import com.lowspin.app.ui.components.LikeParticleButton
 import com.lowspin.app.ui.components.TurntableVinyl
 import com.lowspin.app.ui.components.WaveformSeekBar
 import com.lowspin.app.ui.settings.LocalAppearance
+import com.lowspin.app.ui.settings.SwipeAction
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun NowPlayingScreen(
     state: PlayerUiState,
@@ -124,18 +142,25 @@ fun NowPlayingScreen(
     sleepLabel: String,
     onSleepClick: () -> Unit,
     onSpeedClick: () -> Unit = {},
+    onSpeedChanged: (Float) -> Unit = {},
     onEqualizerClick: () -> Unit = {},
     onQueueClick: () -> Unit = {},
     onSongInfoClick: () -> Unit = {},
     loopRange: Pair<Long, Long>? = null,
     onABRepeatClick: () -> Unit = {},
-    onCarModeClick: () -> Unit = {}
+    onCarModeClick: () -> Unit = {},
+    onStartRadio: () -> Unit = {},
+    equalizerSettings: EqualizerSettings? = null,
+    equalizerManager: EqualizerManager? = null,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val song = state.currentSong ?: return
     val appearance = LocalAppearance.current
     val context = LocalContext.current
     val visualizerEnabled by appearance.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerStyle by appearance.visualizerStyle.collectAsStateWithLifecycle()
+    val spectrumWallpaper by appearance.spectrumWallpaper.collectAsStateWithLifecycle()
     val pureBlack by appearance.pureBlack.collectAsStateWithLifecycle()
     val turntableMode by appearance.turntableMode.collectAsStateWithLifecycle()
     val reduceMotion by appearance.reduceMotion.collectAsStateWithLifecycle()
@@ -143,6 +168,10 @@ fun NowPlayingScreen(
     val keepScreenOn by appearance.keepScreenOn.collectAsStateWithLifecycle()
     val waveformSeekbar by appearance.waveformSeekbar.collectAsStateWithLifecycle()
     val fluidMeshLyrics by appearance.fluidMeshLyrics.collectAsStateWithLifecycle()
+    val swipeLeft by appearance.swipeLeftAction.collectAsStateWithLifecycle()
+    val swipeRight by appearance.swipeRightAction.collectAsStateWithLifecycle()
+    val swipeUp by appearance.swipeUpAction.collectAsStateWithLifecycle()
+    val swipeDown by appearance.swipeDownAction.collectAsStateWithLifecycle()
 
     val view = LocalView.current
     DisposableEffect(keepScreenOn) {
@@ -167,26 +196,116 @@ fun NowPlayingScreen(
         else lerp(dominant, baseBg, 0.70f)
     }
 
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    var showBassDial by remember { mutableStateOf(false) }
+    var doubleTapFlashSide by remember { mutableIntStateOf(0) } // -1 = prev, 1 = next
+    var pinchSpeedHud by remember { mutableStateOf<Float?>(null) }
+
+    LaunchedEffect(doubleTapFlashSide) {
+        if (doubleTapFlashSide != 0) {
+            delay(420L)
+            doubleTapFlashSide = 0
+        }
+    }
+
+    LaunchedEffect(pinchSpeedHud) {
+        if (pinchSpeedHud != null) {
+            delay(1000L)
+            pinchSpeedHud = null
+        }
+    }
+
+    fun executeSwipeAction(action: SwipeAction) {
+        when (action) {
+            SwipeAction.NONE -> Unit
+            SwipeAction.DISMISS -> onDismiss()
+            SwipeAction.NEXT -> onNext()
+            SwipeAction.PREVIOUS -> onPrevious()
+            SwipeAction.SEEK_FORWARD_10 -> onSeek((state.positionMs + 10_000L).coerceAtMost(state.durationMs.coerceAtLeast(0L)))
+            SwipeAction.SEEK_BACK_10 -> onSeek((state.positionMs - 10_000L).coerceAtLeast(0L))
+            SwipeAction.TOGGLE_LIKE -> onToggleLike()
+            SwipeAction.CYCLE_SPEED -> {
+                val nextSpeed = when {
+                    state.playbackSpeed < 1.15f -> 1.25f
+                    state.playbackSpeed < 1.40f -> 1.5f
+                    else -> 1.0f
+                }
+                onSpeedChanged(nextSpeed)
+                pinchSpeedHud = nextSpeed
+            }
+            SwipeAction.TOGGLE_LYRICS -> onToggleLyrics()
+            SwipeAction.OPEN_QUEUE -> onQueueClick()
+        }
+    }
+
+    val verticalVisualOffset = if (swipeDown == SwipeAction.DISMISS && dragY > 0f && abs(dragY) >= abs(dragX)) {
+        dragY.roundToInt()
+    } else 0
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(top, middle, baseBg)))
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        if (dragOffset > 160f) onDismiss()
-                        dragOffset = 0f
+            .pointerInput(swipeLeft, swipeRight, swipeUp, swipeDown, state.positionMs, state.playbackSpeed, isLiked) {
+                detectDragGestures(
+                    onDragStart = {
+                        dragX = 0f
+                        dragY = 0f
                     },
-                    onDragCancel = { dragOffset = 0f },
-                    onVerticalDrag = { _, delta ->
-                        dragOffset = (dragOffset + delta).coerceAtLeast(0f)
+                    onDragEnd = {
+                        val threshold = 135f
+                        if (abs(dragX) > abs(dragY)) {
+                            if (dragX < -threshold) executeSwipeAction(swipeLeft)
+                            else if (dragX > threshold) executeSwipeAction(swipeRight)
+                        } else {
+                            if (dragY < -threshold) executeSwipeAction(swipeUp)
+                            else if (dragY > threshold) executeSwipeAction(swipeDown)
+                        }
+                        dragX = 0f
+                        dragY = 0f
+                    },
+                    onDragCancel = {
+                        dragX = 0f
+                        dragY = 0f
+                    },
+                    onDrag = { _, amount ->
+                        dragX += amount.x
+                        dragY += amount.y
                     }
                 )
             }
-            .offset { IntOffset(0, dragOffset.roundToInt()) }
+            .offset { IntOffset(0, verticalVisualOffset) }
     ) {
+        // #4 Spectrum Wallpaper: Full-bleed blurred audio visualizer behind the entire screen
+        if (spectrumWallpaper) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !reduceMotion) {
+                            Modifier.blur(26.dp)
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                AudioVisualizer(
+                    isPlaying = state.isPlaying,
+                    barCount = 34,
+                    style = visualizerStyle,
+                    accentColor = dominant,
+                    reduceMotion = reduceMotion,
+                    height = 520.dp,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseBg.copy(alpha = 0.62f))
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -236,13 +355,12 @@ fun NowPlayingScreen(
                     )
                 }
 
-                IconButton(onClick = onToggleLike) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = if (isLiked) "Remove from Liked Songs" else "Like song",
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                LikeParticleButton(
+                    isLiked = isLiked,
+                    onToggle = onToggleLike,
+                    reduceMotion = reduceMotion
+                )
+
                 IconButton(onClick = onToggleLyrics) {
                     Icon(
                         imageVector = Icons.Rounded.Lyrics,
@@ -290,11 +408,46 @@ fun NowPlayingScreen(
                 }
             }
 
-            // Center Artwork / Vinyl / Lyrics
+            // Center Artwork / Vinyl / Lyrics + Double-tap skip + Pinch-to-speed
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .pointerInput(song.id, showLyrics) {
+                        if (!showLyrics) {
+                            detectTapGestures(
+                                onDoubleTap = { offset ->
+                                    if (offset.x < size.width / 2f) {
+                                        doubleTapFlashSide = -1
+                                        onPrevious()
+                                    } else {
+                                        doubleTapFlashSide = 1
+                                        onNext()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .pointerInput(state.playbackSpeed) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var workingSpeed = state.playbackSpeed
+                            do {
+                                val event = awaitPointerEvent()
+                                val pressedCount = event.changes.count { it.pressed }
+                                if (pressedCount >= 2) {
+                                    val zoom = event.calculateZoom()
+                                    if (abs(zoom - 1f) > 0.012f) {
+                                        workingSpeed = (workingSpeed * zoom).coerceIn(0.5f, 2.5f)
+                                        val snapped = (workingSpeed * 20f).roundToInt() / 20f
+                                        onSpeedChanged(snapped)
+                                        pinchSpeedHud = snapped
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 // Ambient dynamic back-glow reflecting album palette
@@ -341,14 +494,25 @@ fun NowPlayingScreen(
                         isPlaying = state.isPlaying,
                         dominantColor = dominant,
                         reduceMotion = reduceMotion,
+                        playbackSpeed = state.playbackSpeed,
                         modifier = Modifier.fillMaxSize(0.95f)
                     )
                 } else {
                     BoxWithConstraints {
                         val side = minOf(maxWidth, maxHeight) * 0.94f
+                        val sharedMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                            with(sharedTransitionScope) {
+                                Modifier.sharedElement(
+                                    state = rememberSharedContentState(key = "album-art-${song.id}"),
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                            }
+                        } else Modifier
+
                         Box(
                             modifier = Modifier
                                 .size(side)
+                                .then(sharedMod)
                                 .shadow(
                                     elevation = 28.dp,
                                     shape = RoundedCornerShape(18.dp),
@@ -373,11 +537,68 @@ fun NowPlayingScreen(
                         }
                     }
                 }
+
+                // Double-tap skip visual flash indicator
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = doubleTapFlashSide != 0,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(
+                        if (doubleTapFlashSide < 0) Alignment.CenterStart else Alignment.CenterEnd
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (doubleTapFlashSide < 0) Icons.Rounded.FastRewind else Icons.Rounded.FastForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = if (doubleTapFlashSide < 0) "Previous" else "Next",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                // Pinch-to-speed live HUD overlay
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = pinchSpeedHud != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopCenter)
+                ) {
+                    pinchSpeedHud?.let { spd ->
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 10.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.Black.copy(alpha = 0.72f))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "Speed: ${String.format(java.util.Locale.US, "%.2fx", spd)}",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Title and Artist with Format Tag
+            // Title and Artist with Format + BPM + Key Tags
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -402,81 +623,101 @@ fun NowPlayingScreen(
                 }
 
                 // Audio Info & DSP Pill
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val codec = remember(song.mimeType, song.folderPath) {
-                        val ext = song.folderPath.substringAfterLast('.', "").uppercase()
-                        when {
-                            ext in listOf("FLAC", "WAV", "OGG", "OPUS", "AAC", "MP3", "M4A", "ALAC", "AIFF") -> ext
-                            song.mimeType.contains("flac", ignoreCase = true) -> "FLAC"
-                            song.mimeType.contains("wav", ignoreCase = true) -> "WAV"
-                            song.mimeType.contains("ogg", ignoreCase = true) -> "OGG"
-                            song.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
-                            song.mimeType.contains("aac", ignoreCase = true) -> "AAC"
-                            song.mimeType.contains("alac", ignoreCase = true) -> "ALAC"
-                            song.mimeType.contains("mp4", ignoreCase = true) || song.mimeType.contains("m4a", ignoreCase = true) -> "M4A"
-                            song.mimeType.contains("mpeg", ignoreCase = true) || song.mimeType.contains("mp3", ignoreCase = true) -> "MP3"
-                            else -> song.mimeType.substringAfterLast('/').uppercase().take(4)
-                        }
-                    }
-                    val isLossless = codec in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (isLossless) Color(0xFFD4AF37).copy(alpha = 0.20f)
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isLossless) Color(0xFFFFD700).copy(alpha = 0.55f) else Color.Transparent,
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .clickable(onClick = onSongInfoClick)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (isLossless) {
-                                Text(
-                                    text = "HI-RES ",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFFD700),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 10.sp
-                                )
-                            }
-                            Text(
-                                text = codec,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isLossless) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Sleep Timer Quick Pill
+                Column(horizontalAlignment = Alignment.End) {
                     Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable(onClick = onSleepClick)
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
+                        val codec = remember(song.mimeType, song.folderPath) {
+                            val ext = song.folderPath.substringAfterLast('.', "").uppercase()
+                            when {
+                                ext in listOf("FLAC", "WAV", "OGG", "OPUS", "AAC", "MP3", "M4A", "ALAC", "AIFF") -> ext
+                                song.mimeType.contains("flac", ignoreCase = true) -> "FLAC"
+                                song.mimeType.contains("wav", ignoreCase = true) -> "WAV"
+                                song.mimeType.contains("ogg", ignoreCase = true) -> "OGG"
+                                song.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
+                                song.mimeType.contains("aac", ignoreCase = true) -> "AAC"
+                                song.mimeType.contains("alac", ignoreCase = true) -> "ALAC"
+                                song.mimeType.contains("mp4", ignoreCase = true) || song.mimeType.contains("m4a", ignoreCase = true) -> "M4A"
+                                song.mimeType.contains("mpeg", ignoreCase = true) || song.mimeType.contains("mp3", ignoreCase = true) -> "MP3"
+                                else -> song.mimeType.substringAfterLast('/').uppercase().take(4)
+                            }
+                        }
+                        val isLossless = codec in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (isLossless) Color(0xFFD4AF37).copy(alpha = 0.20f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isLossless) Color(0xFFFFD700).copy(alpha = 0.55f) else Color.Transparent,
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .clickable(onClick = onSongInfoClick)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isLossless) {
+                                    Text(
+                                        text = "HI-RES ",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFFFD700),
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Text(
+                                    text = codec,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isLossless) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Sleep Timer Quick Pill
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable(onClick = onSleepClick)
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = sleepLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (song.bpm > 0 || (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown")) {
+                        Spacer(Modifier.height(4.dp))
+                        val bpmKey = buildString {
+                            if (song.bpm > 0) append("${song.bpm} BPM")
+                            if (song.bpm > 0 && song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") append(" • ")
+                            if (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") append(song.musicalKey)
+                        }
                         Text(
-                            text = sleepLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = bpmKey,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -571,45 +812,89 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // Utility bar: Speed/Pitch Pill, Equalizer, Queue
+            // Utility bar: Speed/Pitch Pill, Bass Dial, Radio, Equalizer, Queue
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Playback speed/pitch pill
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable(onClick = onSpeedClick)
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Speed,
-                        contentDescription = "Playback Speed & Pitch",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (state.playbackPitch != 1f) {
-                            "${state.playbackSpeed}x • ${state.playbackPitch}x pitch"
-                        } else {
-                            "${state.playbackSpeed}x"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Playback speed/pitch pill
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable(onClick = onSpeedClick)
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Speed,
+                            contentDescription = "Playback Speed & Pitch",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            text = if (state.playbackPitch != 1f) {
+                                "${state.playbackSpeed}x • ${state.playbackPitch}x"
+                            } else {
+                                "${state.playbackSpeed}x"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Quick Bass Boost Dial toggle pill
+                    if (equalizerSettings != null) {
+                        val bassVal by equalizerSettings.bassBoost.collectAsStateWithLifecycle()
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    if (showBassDial || bassVal > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .clickable { showBassDial = !showBassDial }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Tune,
+                                contentDescription = "Bass Boost Dial",
+                                tint = if (showBassDial || bassVal > 0) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Bass ${bassVal / 10}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (showBassDial || bassVal > 0) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onStartRadio) {
+                        Icon(
+                            imageVector = Icons.Rounded.Radio,
+                            contentDescription = "Start Smart Radio",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     IconButton(onClick = onEqualizerClick) {
                         Icon(
                             imageVector = Icons.Rounded.GraphicEq,
@@ -629,6 +914,52 @@ fun NowPlayingScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+
+        // #12 Dedicated Circular Bass Boost Dial Overlay
+        if (showBassDial && equalizerSettings != null) {
+            val bass by equalizerSettings.bassBoost.collectAsStateWithLifecycle()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable { showBassDial = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(28.dp))
+                        .clickable(enabled = false) {}
+                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Quick Bass Control",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = LowspinTextPrimary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Drag around the dial",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    BassBoostDial(
+                        strength = bass,
+                        onStrengthChange = { newVal ->
+                            if (newVal > 0 && !equalizerSettings.enabled.value) {
+                                equalizerSettings.setEnabled(true)
+                            }
+                            equalizerSettings.setBassBoost(newVal)
+                            equalizerManager?.applyBassBoost(equalizerSettings.enabled.value || newVal > 0, newVal)
+                        },
+                        size = 180.dp
+                    )
+                }
+            }
         }
     }
 }

@@ -13,8 +13,10 @@ android {
         applicationId = "com.lowspin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "2.5.2"
+        versionCode = 21
+        versionName = "2.6.0"
+
+        resourceConfigurations += listOf("en")
 
         vectorDrawables {
             useSupportLibrary = true
@@ -44,7 +46,14 @@ android {
 
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "META-INF/*.version",
+                "META-INF/*.kotlin_module",
+                "kotlin/**",
+                "DebugProbesKt.bin",
+                "/*.properties"
+            )
         }
     }
 

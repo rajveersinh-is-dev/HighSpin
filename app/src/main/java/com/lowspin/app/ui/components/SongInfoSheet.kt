@@ -246,6 +246,12 @@ fun SongInfoSheet(
                     DetailRow(label = "MIME Type", value = song.mimeType)
                     DetailRow(label = "Folder", value = song.folderName)
                     DetailRow(label = "Track / Disc", value = trackDisplay)
+                    if (song.bpm > 0) {
+                        DetailRow(label = "Tempo", value = "${song.bpm} BPM")
+                    }
+                    if (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") {
+                        DetailRow(label = "Musical Key", value = song.musicalKey)
+                    }
                     if (song.year > 0) {
                         DetailRow(label = "Release Year", value = song.year.toString())
                     }

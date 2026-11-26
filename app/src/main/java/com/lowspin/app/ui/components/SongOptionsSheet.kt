@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.HideSource
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -74,6 +75,7 @@ fun SongOptionsSheet(
     onShowInfo: (() -> Unit)? = null,
     onABRepeat: (() -> Unit)? = null,
     onEditTags: (() -> Unit)? = null,
+    onStartRadio: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onRemoveFromLibrary: (() -> Unit)? = null
 ) {
@@ -183,6 +185,14 @@ fun SongOptionsSheet(
                         icon = Icons.Rounded.AllInclusive,
                         label = "A-B loop section tool",
                         onClick = onABRepeat
+                    )
+                }
+                if (onStartRadio != null) {
+                    SheetActionRow(
+                        icon = Icons.Rounded.Radio,
+                        label = "Start Smart Radio (BPM & Key mix)",
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = onStartRadio
                     )
                 }
                 if (onEditTags != null) {

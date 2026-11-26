@@ -112,6 +112,8 @@ class LibraryViewModel(
 
     fun addToQueue(song: SongEntity) = player.addToQueue(song)
 
+    fun startSmartRadio(seed: SongEntity, library: List<SongEntity>) = player.startSmartRadio(seed, library)
+
     fun createPlaylist(name: String?, onCreated: (Long) -> Unit) {
         viewModelScope.launch {
             onCreated(playlistRepository.createPlaylist(name))

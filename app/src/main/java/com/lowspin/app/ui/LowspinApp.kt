@@ -13,12 +13,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -30,7 +33,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -76,6 +78,8 @@ import com.lowspin.app.ui.screens.album.AlbumViewModel
 import com.lowspin.app.ui.screens.artist.ArtistDetailScreen
 import com.lowspin.app.ui.screens.artist.ArtistViewModel
 import com.lowspin.app.ui.screens.carmode.CarModeScreen
+import com.lowspin.app.ui.screens.decades.DecadeBrowserScreen
+import com.lowspin.app.ui.screens.duplicates.DuplicatesScreen
 import com.lowspin.app.ui.screens.equalizer.EqualizerScreen
 import com.lowspin.app.ui.screens.folderdetail.FolderDetailScreen
 import com.lowspin.app.ui.screens.folderdetail.FolderDetailViewModel
@@ -87,6 +91,7 @@ import com.lowspin.app.ui.screens.library.LibraryScreen
 import com.lowspin.app.ui.screens.library.LibraryViewModel
 import com.lowspin.app.ui.screens.liked.LikedSongsScreen
 import com.lowspin.app.ui.screens.liked.LikedViewModel
+import com.lowspin.app.ui.screens.moods.MoodBoardScreen
 import com.lowspin.app.ui.screens.nowplaying.NowPlayingScreen
 import com.lowspin.app.ui.screens.permission.PermissionScreen
 import com.lowspin.app.ui.screens.playlist.PlaylistDetailScreen
@@ -94,6 +99,7 @@ import com.lowspin.app.ui.screens.playlist.PlaylistViewModel
 import com.lowspin.app.ui.screens.search.SearchScreen
 import com.lowspin.app.ui.screens.search.SearchViewModel
 import com.lowspin.app.ui.screens.settings.SettingsScreen
+import com.lowspin.app.ui.screens.stats.PlayStatsScreen
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.LocalListStyle
 import com.lowspin.app.ui.settings.LowspinListStyle
@@ -103,6 +109,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LowspinApp(container: AppContainer) {
     val context = LocalContext.current
@@ -201,6 +208,7 @@ fun LowspinApp(container: AppContainer) {
     }
 
     val songs by libraryViewModel.songs.collectAsStateWithLifecycle()
+    val recentlyPlayed by libraryViewModel.recentlyPlayed.collectAsStateWithLifecycle()
     val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle()
     val albums by libraryViewModel.albums.collectAsStateWithLifecycle()
     val artists by libraryViewModel.artists.collectAsStateWithLifecycle()
@@ -313,6 +321,10 @@ fun LowspinApp(container: AppContainer) {
     val onOpenHidden = remember(navController) { { navController.navigate("hidden") } }
     val onOpenAbout = remember(navController) { { navController.navigate("about") } }
     val onOpenSettings = remember(navController) { { navController.navigate("settings") } }
+    val onOpenDecades = remember(navController) { { navController.navigate("decades") } }
+    val onOpenMoods = remember(navController) { { navController.navigate("moods") } }
+    val onOpenStats = remember(navController) { { navController.navigate("stats") } }
+    val onOpenDuplicates = remember(navController) { { navController.navigate("duplicates") } }
     val onRequestCreatePlaylist = remember { { showCreatePlaylistDialog = true } }
     val onRefresh = remember(libraryViewModel) { { libraryViewModel.refreshLibrary() } }
     val onTogglePlayPause = remember(libraryViewModel) { { libraryViewModel.togglePlayPause() } }
@@ -344,38 +356,21 @@ fun LowspinApp(container: AppContainer) {
     }
 
     CompositionLocalProvider(LocalListStyle provides listStyle) {
+    SharedTransitionLayout {
     Box(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            bottomBar = {
-                if (currentSong != null) {
-                    MiniPlayer(
-                        state = playerState,
-                        isLiked = isLiked,
-                        onExpand = { showNowPlaying = true },
-                        onTogglePlayPause = onTogglePlayPause,
-                        onNext = onNext,
-                        onPrevious = onPrevious,
-                        onToggleLike = onTogglePlayerLike,
-                        modifier = Modifier
-                            .navigationBarsPadding()
-                            .padding(bottom = 8.dp)
-                    )
-                }
-            }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = "library",
-                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
-            ) {
+        NavHost(
+            navController = navController,
+            startDestination = "library",
+            modifier = Modifier.fillMaxSize()
+        ) {
                 composable("library") {
                     LibraryScreen(
                         songs = songs,
+                        recentlyPlayed = recentlyPlayed,
                         playlists = playlists,
                         albums = albums,
                         artists = artists,
@@ -396,6 +391,10 @@ fun LowspinApp(container: AppContainer) {
                         onManageFolders = onOpenFolders,
                         onHiddenSongs = onOpenHidden,
                         onEqualizerClick = onOpenEqualizer,
+                        onDecadesClick = onOpenDecades,
+                        onMoodsClick = onOpenMoods,
+                        onStatsClick = onOpenStats,
+                        onDuplicatesClick = onOpenDuplicates,
                         onAbout = onOpenAbout,
                         onSettings = onOpenSettings,
                         onPlayQueue = onPlayQueue
@@ -518,7 +517,68 @@ fun LowspinApp(container: AppContainer) {
                         onBack = onBack
                     )
                 }
+                composable("decades") {
+                    DecadeBrowserScreen(
+                        songs = songs,
+                        currentSongId = currentSongId,
+                        onBack = onBack,
+                        onPlayQueue = onPlayQueue,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable("moods") {
+                    val analysisProgress by container.musicRepository.audioAnalysisProgress.collectAsStateWithLifecycle()
+                    MoodBoardScreen(
+                        songs = songs,
+                        currentSongId = currentSongId,
+                        analysisProgress = analysisProgress,
+                        onAnalyzeAudio = { container.musicRepository.startBackgroundAudioAnalysis(forceReanalyze = true) },
+                        onBack = onBack,
+                        onPlayQueue = onPlayQueue,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable("stats") {
+                    PlayStatsScreen(
+                        container = container,
+                        songs = songs,
+                        currentSongId = currentSongId,
+                        onBack = onBack,
+                        onPlayQueue = onPlayQueue,
+                        onSongOptions = onOpenOptions
+                    )
+                }
+                composable("duplicates") {
+                    DuplicatesScreen(
+                        songs = songs,
+                        musicRepository = container.musicRepository,
+                        onBack = onBack,
+                        onPlaySong = onPlaySong
+                    )
+                }
             }
+
+        // Floating Glassmorphism MiniPlayer overlay (content scrolls underneath)
+        AnimatedVisibility(
+            visible = !showNowPlaying && currentSong != null,
+            enter = fadeIn(tween(if (reduceMotion) 0 else 180)),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 150)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            MiniPlayer(
+                state = playerState,
+                isLiked = isLiked,
+                onExpand = { showNowPlaying = true },
+                onTogglePlayPause = onTogglePlayPause,
+                onNext = onNext,
+                onPrevious = onPrevious,
+                onToggleLike = onTogglePlayerLike,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                animatedVisibilityScope = this@AnimatedVisibility,
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 8.dp)
+            )
         }
 
         AnimatedVisibility(
@@ -554,6 +614,7 @@ fun LowspinApp(container: AppContainer) {
                 sleepLabel = sleepLabel,
                 onSleepClick = { showSleepDialog = true },
                 onSpeedClick = { showSpeedSheet = true },
+                onSpeedChanged = { spd -> container.playbackController.setPlaybackSpeed(spd) },
                 onEqualizerClick = {
                     showNowPlaying = false
                     navController.navigate("equalizer")
@@ -562,7 +623,14 @@ fun LowspinApp(container: AppContainer) {
                 onSongInfoClick = { currentSong?.let { infoSong = it } },
                 loopRange = loopRange,
                 onABRepeatClick = { showABRepeatSheet = true },
-                onCarModeClick = { showCarMode = true }
+                onCarModeClick = { showCarMode = true },
+                onStartRadio = {
+                    currentSong?.let { libraryViewModel.startSmartRadio(it, songs) }
+                },
+                equalizerSettings = container.equalizerSettings,
+                equalizerManager = container.equalizerManager,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                animatedVisibilityScope = this@AnimatedVisibility
             )
         }
 
@@ -595,6 +663,7 @@ fun LowspinApp(container: AppContainer) {
                 onExit = { showCarMode = false }
             )
         }
+    }
     }
     }
 
@@ -642,6 +711,11 @@ fun LowspinApp(container: AppContainer) {
                 val s = song
                 optionsSong = null
                 editTagsSong = s
+            },
+            onStartRadio = {
+                val s = song
+                optionsSong = null
+                libraryViewModel.startSmartRadio(s, songs)
             },
             onRemoveFromPlaylist = if (currentPlaylistId != null) {
                 {

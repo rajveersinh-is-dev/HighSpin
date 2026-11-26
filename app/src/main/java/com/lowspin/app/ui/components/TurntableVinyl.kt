@@ -19,9 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,24 +58,30 @@ fun TurntableVinyl(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
     dominantColor: Color = MaterialTheme.colorScheme.primary,
-    reduceMotion: Boolean = false
+    reduceMotion: Boolean = false,
+    playbackSpeed: Float = 1f
 ) {
     val repository = LocalAlbumArtRepository.current
     val bitmap by produceState<Bitmap?>(initialValue = null, songId) {
         value = repository.loadBitmap(songId, 500)
     }
 
-    // Continuous 33.3 RPM rotation
-    val infiniteTransition = rememberInfiniteTransition(label = "vinylSpinTransition")
-    val spinAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "vinylSpinAngle"
-    )
+    // Continuous playback-rate-synced rotation that holds position smoothly when paused
+    var spinAngle by remember(songId) { mutableFloatStateOf(0f) }
+    LaunchedEffect(isPlaying, playbackSpeed, reduceMotion) {
+        if (isPlaying && !reduceMotion) {
+            var lastNanos = withFrameNanos { it }
+            while (true) {
+                withFrameNanos { nowNanos ->
+                    val dtSec = ((nowNanos - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                    lastNanos = nowNanos
+                    spinAngle = (spinAngle + dtSec * 100f * playbackSpeed.coerceIn(0.4f, 2.5f)) % 360f
+                }
+            }
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "vinylGlowTransition")
 
     // Needle arm angle: 0deg resting, 26deg on record
     val needleAngle by animateFloatAsState(
@@ -91,7 +101,7 @@ fun TurntableVinyl(
         label = "glowPulse"
     )
 
-    val currentRotation = if (isPlaying && !reduceMotion) spinAngle else 0f
+    val currentRotation = if (!reduceMotion) spinAngle else 0f
     val needleJitter = if (isPlaying && !reduceMotion) {
         0.35f * sin((spinAngle * 4f * PI.toFloat() / 180f))
     } else 0f

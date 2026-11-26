@@ -36,10 +36,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val textScale by appearance.textScale.collectAsStateWithLifecycle()
+            val playerState by container.playbackController.state.collectAsStateWithLifecycle()
             val density = LocalDensity.current
 
             CompositionLocalProvider(LocalAppearance provides appearance) {
-                LowspinTheme {
+                LowspinTheme(dominantColor = playerState.dominantColor) {
                     CompositionLocalProvider(
                         LocalDensity provides Density(
                             density = density.density,
