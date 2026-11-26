@@ -12,6 +12,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.view.KeyEvent
 import androidx.annotation.OptIn
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -44,7 +45,8 @@ import kotlinx.coroutines.runBlocking
 class PlaybackService : MediaSessionService() {
 
     companion object {
-        const val NOTIFICATION_CHANNEL_ID = HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
+        const val NOTIFICATION_ID = 1001
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v10"
         const val FADE_DURATION_MS = 5_000L
         const val TIMER_TICK_MS = 250L
 
@@ -118,6 +120,31 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+
+        createNotificationChannel()
+
+        // Android 14+: foreground service must call startForeground() within 5 seconds.
+        // Post a minimal placeholder immediately so the system doesn't kill us.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val placeholder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_vinyl)
+                .setContentTitle("HighSpin")
+                .setContentText("Starting playback…")
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setSilent(true)
+                .setOngoing(true)
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                .build()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    placeholder,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, placeholder)
+            }
+        }
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -203,10 +230,13 @@ class PlaybackService : MediaSessionService() {
             }
         })
 
-        createNotificationChannel()
         HighSpinLiveNotificationProvider.publishPlaybackShortcut(this)
-        val notificationProvider = HighSpinLiveNotificationProvider(this)
-        setMediaNotificationProvider(notificationProvider)
+        setMediaNotificationProvider(
+            SafeNotificationProvider(
+                primary = HighSpinLiveNotificationProvider(this),
+                fallback = DefaultMediaNotificationProvider.Builder(this).build()
+            )
+        )
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -234,59 +264,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun createNotificationChannel() {
-        val manager = getSystemService(NotificationManager::class.java) ?: return
-
-        // Clean up legacy and previous channels that were stuck on lower importance
-        for (oldChannelId in HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS) {
-            runCatching {
-                manager.deleteNotificationChannel(oldChannelId)
-            }
-        }
-
-        // If the current channel exists with importance lower than IMPORTANCE_HIGH, delete it so it can be recreated
-        val existing = manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID)
-        if (existing != null && existing.importance < NotificationManager.IMPORTANCE_HIGH) {
-            runCatching {
-                manager.deleteNotificationChannel(NOTIFICATION_CHANNEL_ID)
-            }
-        }
-
-        val channel = NotificationChannel(
-            NOTIFICATION_CHANNEL_ID,
-            getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "HighSpin live playback controls, status-bar updates, and notification bubbles"
-            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-            setShowBadge(true)
-            enableVibration(false)
-            setSound(null, null)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                setAllowBubbles(true)
-            }
-        }
-        manager.createNotificationChannel(channel)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val convChannelId = HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
-            val existingConv = manager.getNotificationChannel(convChannelId)
-            if (existingConv == null) {
-                val conversationChannel = NotificationChannel(
-                    convChannelId,
-                    "Now Playing Bubble",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "HighSpin playback floating bubble conversation"
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                    setShowBadge(true)
-                    enableVibration(false)
-                    setSound(null, null)
-                    setAllowBubbles(true)
-                    setConversationId(NOTIFICATION_CHANNEL_ID, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
-                }
-                manager.createNotificationChannel(conversationChannel)
-            }
-        }
+        LowspinApplication.createNotificationChannels(this)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

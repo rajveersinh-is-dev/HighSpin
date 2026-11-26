@@ -62,10 +62,11 @@ class HighSpinLiveNotificationProvider(
     companion object {
         const val NOTIFICATION_ID = 1001
         const val BUBBLE_NOTIFICATION_ID = 1002
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v9"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v10"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
         val CONVERSATION_CHANNEL_ID = "${NOTIFICATION_CHANNEL_ID}_$PLAYBACK_SHORTCUT_ID"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v9",
             "com.lowspin.app.playback.live.v8",
             "com.lowspin.app.playback.live.v7",
             "com.lowspin.app.playback.live.v6",
@@ -338,6 +339,7 @@ class HighSpinLiveNotificationProvider(
                     .setColorized(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                     .addAction(R.drawable.ic_stat_vinyl, "Prev", prevIntent)
                     .addAction(R.drawable.ic_stat_vinyl, if (isPlaybackActive) "Pause" else "Play", playPauseIntent)
                     .addAction(R.drawable.ic_stat_vinyl, "Next", nextIntent)
@@ -551,8 +553,14 @@ class HighSpinLiveNotificationProvider(
         // NotificationCompat.Builder (which strips MediaStyle and causes Android 15 MediaDataManager
         // and OxygenOS 15 Live Alerts to drop the media capsule).
         val notification = rawNotification
-        val themeColor = HighSpinThemes.getOrNull(appearance.themeIndex.value)?.primary?.toArgb() ?: 0xFFA78BFA.toInt()
-        notification.color = themeColor
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching {
+                val field = Notification::class.java.getDeclaredField("mForegroundServiceBehavior")
+                field.isAccessible = true
+                field.setInt(notification, Notification.FOREGROUND_SERVICE_IMMEDIATE)
+            }
+        }
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
         val flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
@@ -605,7 +613,7 @@ class HighSpinLiveNotificationProvider(
 
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
-            putBoolean(EXTRA_ANDROID_COLORIZED, true)
+            remove(EXTRA_ANDROID_COLORIZED)
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")

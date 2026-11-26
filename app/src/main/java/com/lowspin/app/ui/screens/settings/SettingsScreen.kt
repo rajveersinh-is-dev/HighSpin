@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -684,17 +686,26 @@ private fun ChoiceRow(
     selected: Float,
     onSelect: (Float) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
             color = LowspinTextPrimary
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
+        // Use wrapContentWidth so the HorizontalScrollable row is not
+        // constrained by fillMaxWidth during OxygenOS's intrinsic measurement pass.
+        // The outer Column is already fillMaxWidth so the whole row is clipped correctly.
+        val scrollState = rememberScrollState()
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .wrapContentWidth(align = Alignment.Start, unbounded = false)
+                .horizontalScroll(scrollState),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             options.forEach { (label, value) ->
                 val active = selected == value
@@ -704,16 +715,16 @@ private fun ChoiceRow(
                     softWrap = false,
                     style = MaterialTheme.typography.labelMedium,
                     color = if (active) LowspinOnAccent
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
                         .background(
-                            if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                            if (active) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant
                         )
                         .clickable { onSelect(value) }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 )
-                Spacer(Modifier.width(8.dp))
             }
         }
     }

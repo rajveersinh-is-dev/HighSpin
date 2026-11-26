@@ -14,7 +14,7 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v9",
+            "com.lowspin.app.playback.live.v10",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
@@ -22,11 +22,11 @@ class LiveNotificationTest {
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
         )
         assertEquals(
-            "com.lowspin.app.playback.live.v9_com.lowspin.app.playback_bubble",
+            "com.lowspin.app.playback.live.v10_com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
         )
         assertTrue(
-            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v8")
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v9")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v7")

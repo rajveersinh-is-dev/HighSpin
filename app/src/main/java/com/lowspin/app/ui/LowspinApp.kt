@@ -100,6 +100,7 @@ import com.lowspin.app.ui.settings.LowspinListStyle
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 @Composable
@@ -182,11 +183,19 @@ fun LowspinApp(container: AppContainer) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentPlaylistId = backStackEntry?.arguments?.getLong("playlistId")?.takeIf { it > 0L }
 
-    LaunchedEffect(backStackEntry) {
-        if (backStackEntry == null || navController.currentDestination == null) {
-            navController.navigate("library") {
-                popUpTo(0) { inclusive = true }
-                launchSingleTop = true
+    // Guard: only recover if the back-stack is genuinely empty *after* the
+    // NavHost has had a chance to settle. The navController is not ready until
+    // it has a graph attached, so check that first.
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            // If the entry is null AND the graph is already set, the stack is
+            // truly empty — navigate home to recover gracefully.
+            @Suppress("SENSELESS_COMPARISON")
+            if (entry == null && runCatching { navController.graph.nodes.size() > 0 }.getOrDefault(false)) {
+                navController.navigate("library") {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
             }
         }
     }
