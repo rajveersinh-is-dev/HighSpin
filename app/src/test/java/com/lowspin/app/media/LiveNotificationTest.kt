@@ -55,6 +55,10 @@ class LiveNotificationTest {
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
         assertEquals(1002, HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
         assertEquals(
+            "android.colorized",
+            HighSpinLiveNotificationProvider.EXTRA_ANDROID_COLORIZED
+        )
+        assertEquals(
             "android.requestPromotedOngoing",
             HighSpinLiveNotificationProvider.EXTRA_REQUEST_PROMOTED_ONGOING
         )
@@ -493,6 +497,10 @@ class LiveNotificationTest {
         assertTrue(HighSpinLiveNotificationProvider.NOTIFICATION_ID != HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
         assertEquals(1002, HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
+        assertEquals(
+            "android.colorized",
+            HighSpinLiveNotificationProvider.EXTRA_ANDROID_COLORIZED
+        )
     }
 
     @Test

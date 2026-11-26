@@ -490,7 +490,12 @@ class HighSpinLiveNotificationProvider(
         onNotificationChangedCallback: MediaNotification.Provider.Callback
     ): MediaNotification {
         val wrappedCallback = MediaNotification.Provider.Callback { updatedMediaNotification ->
-            val processed = decorateNotification(mediaSession, updatedMediaNotification)
+            val processed = runCatching {
+                decorateNotification(mediaSession, updatedMediaNotification)
+            }.getOrElse { t ->
+                android.util.Log.e("HighSpinLiveNotification", "Failed to decorate notification in callback, using raw", t)
+                updatedMediaNotification
+            }
             onNotificationChangedCallback.onNotificationChanged(processed)
         }
 
@@ -501,7 +506,12 @@ class HighSpinLiveNotificationProvider(
             wrappedCallback
         )
 
-        return decorateNotification(mediaSession, baseMediaNotification)
+        return runCatching {
+            decorateNotification(mediaSession, baseMediaNotification)
+        }.getOrElse { t ->
+            android.util.Log.e("HighSpinLiveNotification", "Failed to decorate base notification, using raw", t)
+            baseMediaNotification
+        }
     }
 
     override fun handleCustomCommand(
@@ -553,6 +563,7 @@ class HighSpinLiveNotificationProvider(
         // NotificationCompat.Builder (which strips MediaStyle and causes Android 15 MediaDataManager
         // and OxygenOS 15 Live Alerts to drop the media capsule).
         val notification = rawNotification
+        notification.color = Notification.COLOR_DEFAULT
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
@@ -614,6 +625,8 @@ class HighSpinLiveNotificationProvider(
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
             remove(EXTRA_ANDROID_COLORIZED)
+            remove("colorized")
+            remove("android.color")
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")

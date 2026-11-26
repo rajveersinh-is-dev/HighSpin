@@ -33,6 +33,7 @@ class SafeNotificationProvider(
         return try {
             primary.handleCustomCommand(session, action, extras)
         } catch (e: Throwable) {
+            android.util.Log.e("SafeNotificationProvider", "Primary handleCustomCommand failed, using fallback", e)
             fallback.handleCustomCommand(session, action, extras)
         }
     }

@@ -568,7 +568,12 @@ class PlaybackService : MediaSessionService() {
                 }
                 if (::player.isInitialized && player.mediaItemCount > 0) {
                     runCatching {
-                        setMediaNotificationProvider(HighSpinLiveNotificationProvider(this@PlaybackService))
+                        setMediaNotificationProvider(
+                            SafeNotificationProvider(
+                                primary = HighSpinLiveNotificationProvider(this@PlaybackService),
+                                fallback = DefaultMediaNotificationProvider.Builder(this@PlaybackService).build()
+                            )
+                        )
                     }
                 }
             }
