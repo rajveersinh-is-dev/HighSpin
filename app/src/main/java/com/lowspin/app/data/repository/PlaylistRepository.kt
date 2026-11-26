@@ -46,6 +46,10 @@ class PlaylistRepository(
         dao.rename(playlistId, clean, System.currentTimeMillis())
     }
 
+    suspend fun updateCover(playlistId: Long, customCoverUri: String?, gradientColorIndex: Int?) {
+        dao.updateCover(playlistId, customCoverUri, gradientColorIndex, System.currentTimeMillis())
+    }
+
     suspend fun deletePlaylist(playlistId: Long) {
         dao.delete(playlistId)
     }

@@ -35,5 +35,7 @@ data class PlaylistSummary(
     val createdAt: Long,
     val updatedAt: Long,
     val songCount: Int,
-    val artSongId: Long?
+    val artSongId: Long?,
+    val customCoverUri: String? = null,
+    val gradientColorIndex: Int? = null
 )

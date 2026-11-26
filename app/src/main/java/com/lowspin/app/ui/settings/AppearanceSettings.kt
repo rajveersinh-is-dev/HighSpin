@@ -233,6 +233,44 @@ class AppearanceSettings(context: Context) {
     private val _crossfadeSec = MutableStateFlow(prefs.getInt(KEY_CROSSFADE_SEC, 0))
     val crossfadeSec: StateFlow<Int> = _crossfadeSec.asStateFlow()
 
+    private fun loadTabsOrder(): List<String> {
+        val raw = prefs.getString(KEY_LIBRARY_TABS_ORDER, null) ?: return DEFAULT_LIBRARY_TABS
+        val list = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val valid = DEFAULT_LIBRARY_TABS.toSet()
+        val existing = list.filter { it in valid }.distinct()
+        val missing = DEFAULT_LIBRARY_TABS.filter { it !in existing }
+        return existing + missing
+    }
+
+    private fun loadHiddenTabs(): Set<String> {
+        val raw = prefs.getString(KEY_HIDDEN_LIBRARY_TABS, null) ?: return emptySet()
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    private val _volumeNormalization = MutableStateFlow(prefs.getBoolean(KEY_VOLUME_NORMALIZATION, false))
+    val volumeNormalization: StateFlow<Boolean> = _volumeNormalization.asStateFlow()
+
+    private val _pauseOnHeadsetDisconnect = MutableStateFlow(prefs.getBoolean(KEY_PAUSE_ON_HEADSET_DISCONNECT, true))
+    val pauseOnHeadsetDisconnect: StateFlow<Boolean> = _pauseOnHeadsetDisconnect.asStateFlow()
+
+    private val _autoResumeBluetooth = MutableStateFlow(prefs.getBoolean(KEY_AUTO_RESUME_BLUETOOTH, false))
+    val autoResumeBluetooth: StateFlow<Boolean> = _autoResumeBluetooth.asStateFlow()
+
+    private val _waveformSeekbar = MutableStateFlow(prefs.getBoolean(KEY_WAVEFORM_SEEKBAR, true))
+    val waveformSeekbar: StateFlow<Boolean> = _waveformSeekbar.asStateFlow()
+
+    private val _fluidMeshLyrics = MutableStateFlow(prefs.getBoolean(KEY_FLUID_MESH_LYRICS, true))
+    val fluidMeshLyrics: StateFlow<Boolean> = _fluidMeshLyrics.asStateFlow()
+
+    private val _libraryTabsOrder = MutableStateFlow(loadTabsOrder())
+    val libraryTabsOrder: StateFlow<List<String>> = _libraryTabsOrder.asStateFlow()
+
+    private val _hiddenLibraryTabs = MutableStateFlow(loadHiddenTabs())
+    val hiddenLibraryTabs: StateFlow<Set<String>> = _hiddenLibraryTabs.asStateFlow()
+
+    private val _defaultLibraryTab = MutableStateFlow(prefs.getString(KEY_DEFAULT_LIBRARY_TAB, "songs") ?: "songs")
+    val defaultLibraryTab: StateFlow<String> = _defaultLibraryTab.asStateFlow()
+
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             KEY_THEME -> _themeIndex.value = prefs.getInt(KEY_THEME, 0).coerceIn(0, HighSpinThemes.lastIndex)
@@ -256,6 +294,14 @@ class AppearanceSettings(context: Context) {
             KEY_LYRICS_SYNC_OFFSET -> _lyricsSyncOffset.value = prefs.getInt(KEY_LYRICS_SYNC_OFFSET, 0)
             KEY_KEEP_SCREEN_ON -> _keepScreenOn.value = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
             KEY_CROSSFADE_SEC -> _crossfadeSec.value = prefs.getInt(KEY_CROSSFADE_SEC, 0)
+            KEY_VOLUME_NORMALIZATION -> _volumeNormalization.value = prefs.getBoolean(KEY_VOLUME_NORMALIZATION, false)
+            KEY_PAUSE_ON_HEADSET_DISCONNECT -> _pauseOnHeadsetDisconnect.value = prefs.getBoolean(KEY_PAUSE_ON_HEADSET_DISCONNECT, true)
+            KEY_AUTO_RESUME_BLUETOOTH -> _autoResumeBluetooth.value = prefs.getBoolean(KEY_AUTO_RESUME_BLUETOOTH, false)
+            KEY_WAVEFORM_SEEKBAR -> _waveformSeekbar.value = prefs.getBoolean(KEY_WAVEFORM_SEEKBAR, true)
+            KEY_FLUID_MESH_LYRICS -> _fluidMeshLyrics.value = prefs.getBoolean(KEY_FLUID_MESH_LYRICS, true)
+            KEY_LIBRARY_TABS_ORDER -> _libraryTabsOrder.value = loadTabsOrder()
+            KEY_HIDDEN_LIBRARY_TABS -> _hiddenLibraryTabs.value = loadHiddenTabs()
+            KEY_DEFAULT_LIBRARY_TAB -> _defaultLibraryTab.value = prefs.getString(KEY_DEFAULT_LIBRARY_TAB, "songs") ?: "songs"
         }
     }
 
@@ -332,11 +378,45 @@ class AppearanceSettings(context: Context) {
     fun setCrossfadeSec(seconds: Int) = store { putInt(KEY_CROSSFADE_SEC, seconds.coerceIn(0, 12)) }
         .also { _crossfadeSec.value = seconds.coerceIn(0, 12) }
 
+    fun setVolumeNormalization(value: Boolean) = store { putBoolean(KEY_VOLUME_NORMALIZATION, value) }
+        .also { _volumeNormalization.value = value }
+
+    fun setPauseOnHeadsetDisconnect(value: Boolean) = store { putBoolean(KEY_PAUSE_ON_HEADSET_DISCONNECT, value) }
+        .also { _pauseOnHeadsetDisconnect.value = value }
+
+    fun setAutoResumeBluetooth(value: Boolean) = store { putBoolean(KEY_AUTO_RESUME_BLUETOOTH, value) }
+        .also { _autoResumeBluetooth.value = value }
+
+    fun setWaveformSeekbar(value: Boolean) = store { putBoolean(KEY_WAVEFORM_SEEKBAR, value) }
+        .also { _waveformSeekbar.value = value }
+
+    fun setFluidMeshLyrics(value: Boolean) = store { putBoolean(KEY_FLUID_MESH_LYRICS, value) }
+        .also { _fluidMeshLyrics.value = value }
+
+    fun setLibraryTabsOrder(order: List<String>) {
+        val serialized = order.joinToString(",")
+        store { putString(KEY_LIBRARY_TABS_ORDER, serialized) }
+        _libraryTabsOrder.value = order
+    }
+
+    fun setHiddenLibraryTabs(hidden: Set<String>) {
+        val serialized = hidden.joinToString(",")
+        store { putString(KEY_HIDDEN_LIBRARY_TABS, serialized) }
+        _hiddenLibraryTabs.value = hidden
+    }
+
+    fun setDefaultLibraryTab(tab: String) {
+        store { putString(KEY_DEFAULT_LIBRARY_TAB, tab) }
+        _defaultLibraryTab.value = tab
+    }
+
     private fun store(edit: android.content.SharedPreferences.Editor.() -> Unit) {
         prefs.edit().apply(edit).apply()
     }
 
-    private companion object {
+    companion object {
+        val DEFAULT_LIBRARY_TABS = listOf("songs", "albums", "artists", "folders", "playlists")
+
         const val KEY_THEME = "theme_preset"
         const val KEY_ACCENT = "accent"
         const val KEY_PURE_BLACK = "pure_black"
@@ -358,5 +438,13 @@ class AppearanceSettings(context: Context) {
         const val KEY_LYRICS_SYNC_OFFSET = "lyrics_sync_offset"
         const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         const val KEY_CROSSFADE_SEC = "crossfade_sec"
+        const val KEY_VOLUME_NORMALIZATION = "volume_normalization"
+        const val KEY_PAUSE_ON_HEADSET_DISCONNECT = "pause_on_headset_disconnect"
+        const val KEY_AUTO_RESUME_BLUETOOTH = "auto_resume_bluetooth"
+        const val KEY_WAVEFORM_SEEKBAR = "waveform_seekbar"
+        const val KEY_FLUID_MESH_LYRICS = "fluid_mesh_lyrics"
+        const val KEY_LIBRARY_TABS_ORDER = "library_tabs_order"
+        const val KEY_HIDDEN_LIBRARY_TABS = "hidden_library_tabs"
+        const val KEY_DEFAULT_LIBRARY_TAB = "default_library_tab"
     }
 }

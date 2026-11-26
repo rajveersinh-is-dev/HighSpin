@@ -62,7 +62,9 @@ import androidx.navigation.navArgument
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.data.lyrics.Lyrics
 import com.lowspin.app.di.AppContainer
+import com.lowspin.app.ui.components.ABRepeatSheet
 import com.lowspin.app.ui.components.CreatePlaylistDialog
+import com.lowspin.app.ui.components.EditTagsSheet
 import com.lowspin.app.ui.components.MiniPlayer
 import com.lowspin.app.ui.components.QueueSheet
 import com.lowspin.app.ui.components.SongInfoSheet
@@ -73,6 +75,7 @@ import com.lowspin.app.ui.screens.album.AlbumDetailScreen
 import com.lowspin.app.ui.screens.album.AlbumViewModel
 import com.lowspin.app.ui.screens.artist.ArtistDetailScreen
 import com.lowspin.app.ui.screens.artist.ArtistViewModel
+import com.lowspin.app.ui.screens.carmode.CarModeScreen
 import com.lowspin.app.ui.screens.equalizer.EqualizerScreen
 import com.lowspin.app.ui.screens.folderdetail.FolderDetailScreen
 import com.lowspin.app.ui.screens.folderdetail.FolderDetailViewModel
@@ -211,6 +214,10 @@ fun LowspinApp(container: AppContainer) {
     var sleepNow by remember { mutableStateOf(System.currentTimeMillis()) }
     val sleepEndsAt by container.sleepTimer.endsAt.collectAsStateWithLifecycle()
     val sleepMode by container.sleepTimer.mode.collectAsStateWithLifecycle()
+    val loopRange by container.playbackController.loopRange.collectAsStateWithLifecycle()
+    var showABRepeatSheet by rememberSaveable { mutableStateOf(false) }
+    var showCarMode by rememberSaveable { mutableStateOf(false) }
+    var editTagsSong by remember { mutableStateOf<SongEntity?>(null) }
     var optionsSong by remember { mutableStateOf<SongEntity?>(null) }
     var infoSong by remember { mutableStateOf<SongEntity?>(null) }
     var songToHide by remember { mutableStateOf<SongEntity?>(null) }
@@ -311,13 +318,15 @@ fun LowspinApp(container: AppContainer) {
         { libraryViewModel.toggleLike(currentSongId ?: -1L, !isLiked) }
     }
 
-    BackHandler(enabled = showNowPlaying) { showNowPlaying = false }
-    BackHandler(enabled = !showNowPlaying && songToHide != null) { songToHide = null }
-    BackHandler(enabled = !showNowPlaying && songToHide == null && optionsSong != null) {
+    BackHandler(enabled = showCarMode) { showCarMode = false }
+    BackHandler(enabled = !showCarMode && showNowPlaying) { showNowPlaying = false }
+    BackHandler(enabled = !showCarMode && !showNowPlaying && songToHide != null) { songToHide = null }
+    BackHandler(enabled = !showCarMode && !showNowPlaying && songToHide == null && optionsSong != null) {
         optionsSong = null
     }
     BackHandler(
-        enabled = !showNowPlaying &&
+        enabled = !showCarMode &&
+            !showNowPlaying &&
             songToHide == null &&
             optionsSong == null &&
             backStackEntry?.destination?.route == "library"
@@ -541,7 +550,40 @@ fun LowspinApp(container: AppContainer) {
                     navController.navigate("equalizer")
                 },
                 onQueueClick = { showQueueSheet = true },
-                onSongInfoClick = { currentSong?.let { infoSong = it } }
+                onSongInfoClick = { currentSong?.let { infoSong = it } },
+                loopRange = loopRange,
+                onABRepeatClick = { showABRepeatSheet = true },
+                onCarModeClick = { showCarMode = true }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showCarMode && currentSong != null,
+            enter = slideInVertically(
+                animationSpec = tween(
+                    durationMillis = if (reduceMotion) 0 else 260,
+                    easing = EaseOut
+                )
+            ) { fullHeight -> fullHeight } + fadeIn(tween(if (reduceMotion) 0 else 200)),
+            exit = slideOutVertically(
+                animationSpec = tween(
+                    durationMillis = if (reduceMotion) 0 else 240,
+                    easing = EaseOut
+                )
+            ) { fullHeight -> fullHeight } + fadeOut(tween(if (reduceMotion) 0 else 180))
+        ) {
+            CarModeScreen(
+                state = playerState,
+                isLiked = isLiked,
+                onTogglePlayPause = onTogglePlayPause,
+                onNext = onNext,
+                onPrevious = onPrevious,
+                onSeekRelative = { deltaMs ->
+                    val newPos = (playerState.positionMs + deltaMs).coerceIn(0L, playerState.durationMs.coerceAtLeast(0L))
+                    container.playbackController.seekTo(newPos)
+                },
+                onToggleLike = onTogglePlayerLike,
+                onExit = { showCarMode = false }
             )
         }
     }
@@ -578,6 +620,19 @@ fun LowspinApp(container: AppContainer) {
                 val s = song
                 optionsSong = null
                 infoSong = s
+            },
+            onABRepeat = {
+                val s = song
+                optionsSong = null
+                if (playerState.currentSong?.id != s.id) {
+                    container.playbackController.playQueue(listOf(s), 0, "A-B Repeat")
+                }
+                showABRepeatSheet = true
+            },
+            onEditTags = {
+                val s = song
+                optionsSong = null
+                editTagsSong = s
             },
             onRemoveFromPlaylist = if (currentPlaylistId != null) {
                 {
@@ -750,6 +805,52 @@ fun LowspinApp(container: AppContainer) {
                 container.playbackController.setSpeedAndPitch(speed, pitch)
             },
             onDismiss = { showSpeedSheet = false }
+        )
+    }
+
+    editTagsSong?.let { song ->
+        EditTagsSheet(
+            song = song,
+            onSave = { title, artist, album, trackNumber, year ->
+                scope.launch {
+                    container.musicRepository.updateSongTags(
+                        id = song.id,
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        trackNumber = trackNumber,
+                        year = year
+                    )
+                    container.playbackController.updateSongInCache(
+                        songId = song.id,
+                        title = title.trim().ifBlank { "Unknown Title" },
+                        artist = artist.trim().ifBlank { "Unknown Artist" },
+                        album = album.trim().ifBlank { "Unknown Album" },
+                        trackNumber = trackNumber.coerceAtLeast(0),
+                        year = year.coerceAtLeast(0)
+                    )
+                }
+                editTagsSong = null
+            },
+            onDismiss = { editTagsSong = null }
+        )
+    }
+
+    if (showABRepeatSheet) {
+        ABRepeatSheet(
+            currentPositionMs = playerState.positionMs,
+            durationMs = playerState.durationMs,
+            currentLoopRange = loopRange,
+            onSetLoop = { startMs, endMs ->
+                container.playbackController.setLoopRange(startMs, endMs)
+            },
+            onClearLoop = {
+                container.playbackController.clearLoopRange()
+            },
+            onSeek = { pos ->
+                container.playbackController.seekTo(pos)
+            },
+            onDismiss = { showABRepeatSheet = false }
         )
     }
 }

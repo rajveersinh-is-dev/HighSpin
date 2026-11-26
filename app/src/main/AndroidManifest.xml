@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- OnePlus OxygenOS 15 & ColorOS 15 Fluid Cloud / Pantanal service permissions -->
     <uses-permission android:name="com.oplus.permission.safe.ASSISTANT" />
     <uses-permission android:name="com.oplus.permission.safe.PANTANAL" />

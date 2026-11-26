@@ -108,6 +108,22 @@ class MusicRepository(
         songDao.setLiked(songId, liked)
     }
 
+    suspend fun updateSongTags(
+        id: Long,
+        title: String,
+        artist: String,
+        album: String,
+        trackNumber: Int,
+        year: Int
+    ) {
+        val cleanTitle = title.trim().ifBlank { "Unknown Title" }
+        val cleanArtist = artist.trim().ifBlank { "Unknown Artist" }
+        val cleanAlbum = album.trim().ifBlank { "Unknown Album" }
+        val safeTrack = trackNumber.coerceAtLeast(0)
+        val safeYear = year.coerceAtLeast(0)
+        songDao.updateSongTags(id, cleanTitle, cleanArtist, cleanAlbum, safeTrack, safeYear)
+    }
+
     /** Hides a song from the library; the audio file itself is never touched. */
     suspend fun hideSong(song: SongEntity) {
         hiddenSongDao.upsert(

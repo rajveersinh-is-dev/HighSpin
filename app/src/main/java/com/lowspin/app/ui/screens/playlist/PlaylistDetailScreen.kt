@@ -1,7 +1,10 @@
 package com.lowspin.app.ui.screens.playlist
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,14 +20,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +42,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +68,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.data.db.SongEntity
 import com.lowspin.app.ui.components.CollageArt
+import com.lowspin.app.ui.components.PlaylistCoverArt
+import com.lowspin.app.ui.components.PlaylistGradients
 import com.lowspin.app.ui.components.SongRow
 import com.lowspin.app.ui.components.pressScaleClickable
 import com.lowspin.app.ui.theme.LowspinTextMuted
@@ -79,9 +91,19 @@ fun PlaylistDetailScreen(
     val name = playlist?.name ?: "Playlist"
     val seedColor = remember(name) { Color(GradientPlaceholder.primaryColor(name)) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showCustomizeCover by remember { mutableStateOf(false) }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.setCustomCoverFromUri(context, uri)
+        }
+    }
 
     // Local order so a drag can move rows instantly; persisted when the drag ends.
     var localSongs by remember(songs) { mutableStateOf(songs) }
@@ -158,6 +180,20 @@ fun PlaylistDetailScreen(
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Customize cover art", color = LowspinTextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Palette,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                showCustomizeCover = true
+                            }
+                        )
+                        DropdownMenuItem(
                             text = {
                                 Text(
                                     "Delete playlist",
@@ -188,10 +224,13 @@ fun PlaylistDetailScreen(
                     PlaylistHero(
                         name = name,
                         artSongIds = artSongIds,
+                        customCoverUri = playlist?.customCoverUri,
+                        gradientColorIndex = playlist?.gradientColorIndex,
                         songCount = songs.size,
                         totalDurationMs = songs.sumOf { it.durationMs },
                         onPlay = { viewModel.play(0) },
-                        onShuffle = viewModel::shufflePlay
+                        onShuffle = viewModel::shufflePlay,
+                        onCustomizeCover = { showCustomizeCover = true }
                     )
                 }
 
@@ -331,16 +370,37 @@ fun PlaylistDetailScreen(
             }
         )
     }
+
+    if (showCustomizeCover) {
+        CustomizeCoverDialog(
+            onDismiss = { showCustomizeCover = false },
+            onPickGallery = {
+                showCustomizeCover = false
+                photoLauncher.launch("image/*")
+            },
+            onPickGradient = { index ->
+                showCustomizeCover = false
+                viewModel.updateCover(null, index)
+            },
+            onResetToMosaic = {
+                showCustomizeCover = false
+                viewModel.resetToMosaic(context)
+            }
+        )
+    }
 }
 
 @Composable
 private fun PlaylistHero(
     name: String,
     artSongIds: List<Long>,
+    customCoverUri: String?,
+    gradientColorIndex: Int?,
     songCount: Int,
     totalDurationMs: Long,
     onPlay: () -> Unit,
-    onShuffle: () -> Unit
+    onShuffle: () -> Unit,
+    onCustomizeCover: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -349,7 +409,18 @@ private fun PlaylistHero(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(8.dp))
-        CollageArt(songIds = artSongIds, seed = name, size = 190.dp)
+        Box(
+            modifier = Modifier
+                .pressScaleClickable(onClick = onCustomizeCover)
+        ) {
+            PlaylistCoverArt(
+                songIds = artSongIds,
+                seed = name,
+                size = 190.dp,
+                customCoverUri = customCoverUri,
+                gradientColorIndex = gradientColorIndex
+            )
+        }
         Spacer(Modifier.height(18.dp))
         Text(
             text = name,
@@ -471,6 +542,89 @@ private fun RenamePlaylistDialog(
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun CustomizeCoverDialog(
+    onDismiss: () -> Unit,
+    onPickGallery: () -> Unit,
+    onPickGradient: (Int) -> Unit,
+    onResetToMosaic: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = {
+            Text(
+                text = "Playlist Cover Art",
+                style = MaterialTheme.typography.titleLarge,
+                color = LowspinTextPrimary
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Choose custom photo",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = onPickGallery,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Rounded.Photo, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Select from Gallery")
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                Text(
+                    text = "Or pick a color gradient",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    itemsIndexed(PlaylistGradients) { index, gradient ->
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(gradient))
+                                .clickable { onPickGradient(index) }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(18.dp))
+
+                OutlinedButton(
+                    onClick = onResetToMosaic,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Reset to Track Collage")
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+            ) {
+                Text("Close")
             }
         }
     )

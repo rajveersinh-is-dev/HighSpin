@@ -16,9 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PlaybackStateEntity::class,
         RecentSearchEntity::class,
         ExcludedFolderEntity::class,
-        HiddenSongEntity::class
+        HiddenSongEntity::class,
+        SongEqualizerEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class LowspinDatabase : RoomDatabase() {
@@ -30,6 +31,7 @@ abstract class LowspinDatabase : RoomDatabase() {
     abstract fun recentSearchDao(): RecentSearchDao
     abstract fun excludedFolderDao(): ExcludedFolderDao
     abstract fun hiddenSongDao(): HiddenSongDao
+    abstract fun songEqualizerDao(): SongEqualizerDao
 
     companion object {
         @Volatile
@@ -118,6 +120,35 @@ abstract class LowspinDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds customCoverUri and gradientColorIndex columns to playlists,
+         * and creates song_equalizers table for dedicated per-track EQ memory.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `playlists` ADD COLUMN `customCoverUri` TEXT DEFAULT NULL"
+                )
+                db.execSQL(
+                    "ALTER TABLE `playlists` ADD COLUMN `gradientColorIndex` INTEGER DEFAULT NULL"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `song_equalizers` (
+                        `songId` INTEGER NOT NULL,
+                        `presetIndex` INTEGER NOT NULL,
+                        `bassBoost` INTEGER NOT NULL,
+                        `virtualizer` INTEGER NOT NULL,
+                        `loudnessGain` INTEGER NOT NULL,
+                        `customBands` TEXT,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`songId`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun get(context: Context): LowspinDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -130,7 +161,8 @@ abstract class LowspinDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4,
                         MIGRATION_4_5,
-                        MIGRATION_5_6
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
                     )
                     .build()
                     .also { instance = it }

@@ -32,17 +32,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.RadioButtonChecked
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Tab
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -54,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -97,6 +108,16 @@ fun SettingsScreen(
     val ambientGlow by appearance.ambientGlow.collectAsStateWithLifecycle()
     val keepScreenOn by appearance.keepScreenOn.collectAsStateWithLifecycle()
     val crossfadeSec by appearance.crossfadeSec.collectAsStateWithLifecycle()
+    val waveformSeekbar by appearance.waveformSeekbar.collectAsStateWithLifecycle()
+    val fluidMeshLyrics by appearance.fluidMeshLyrics.collectAsStateWithLifecycle()
+    val volumeNormalization by appearance.volumeNormalization.collectAsStateWithLifecycle()
+    val pauseOnHeadsetDisconnect by appearance.pauseOnHeadsetDisconnect.collectAsStateWithLifecycle()
+    val autoResumeBluetooth by appearance.autoResumeBluetooth.collectAsStateWithLifecycle()
+    val libraryTabsOrder by appearance.libraryTabsOrder.collectAsStateWithLifecycle()
+    val hiddenLibraryTabs by appearance.hiddenLibraryTabs.collectAsStateWithLifecycle()
+    val defaultLibraryTab by appearance.defaultLibraryTab.collectAsStateWithLifecycle()
+
+    var showTabCustomizer by remember { mutableStateOf(false) }
 
     var cacheBytes by remember { mutableLongStateOf(container.albumArtRepository.diskCacheSizeBytes()) }
     var isRescanning by remember { mutableStateOf(false) }
@@ -214,6 +235,8 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
                 ToggleRow("Pure Black (AMOLED OLED)", pureBlack, appearance::setPureBlack)
                 ToggleRow("Ambient Artwork Glow", ambientGlow, appearance::setAmbientGlow)
+                ToggleRow("Waveform Seekbar in Now Playing", waveformSeekbar, appearance::setWaveformSeekbar)
+                ToggleRow("Fluid Mesh Dynamic Lyrics", fluidMeshLyrics, appearance::setFluidMeshLyrics)
                 ToggleRow("Audio Visualizer", visualizerEnabled, appearance::setVisualizerEnabled)
                 if (visualizerEnabled) {
                     ChoiceRow(
@@ -250,6 +273,9 @@ fun SettingsScreen(
             )
 
             SettingCard {
+                ToggleRow("Volume Normalization & ReplayGain", volumeNormalization, appearance::setVolumeNormalization)
+                ToggleRow("Pause on Headset / Bluetooth Disconnect", pauseOnHeadsetDisconnect, appearance::setPauseOnHeadsetDisconnect)
+                ToggleRow("Auto-Resume on Bluetooth Connect", autoResumeBluetooth, appearance::setAutoResumeBluetooth)
                 ToggleRow("Shake to Skip Track", shakeToSkip, appearance::setShakeToSkip)
                 ToggleRow("Flip Face-Down to Pause", flipToPause, appearance::setFlipToPause)
                 ToggleRow("Keep Screen On in Now Playing", keepScreenOn, appearance::setKeepScreenOn)
@@ -366,6 +392,44 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(if (isRescanning) "Scanning" else "Rescan")
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Library Tabs & Default View",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = LowspinTextPrimary
+                        )
+                        Text(
+                            text = "Reorder, show/hide tabs, and choose default start tab",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = { showTabCustomizer = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Tab,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Customize")
                     }
                 }
             }
@@ -553,6 +617,22 @@ fun SettingsScreen(
             Spacer(Modifier.height(96.dp))
         }
     }
+
+    if (showTabCustomizer) {
+        TabCustomizerDialog(
+            currentOrder = libraryTabsOrder,
+            hiddenTabs = hiddenLibraryTabs,
+            defaultTab = defaultLibraryTab,
+            onDismiss = { showTabCustomizer = false },
+            onSave = { newOrder, newHidden, newDefault ->
+                appearance.setLibraryTabsOrder(newOrder)
+                appearance.setHiddenLibraryTabs(newHidden)
+                appearance.setDefaultLibraryTab(newDefault)
+                showTabCustomizer = false
+                Toast.makeText(context, "Library tabs updated", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
 }
 
 @Composable
@@ -699,4 +779,193 @@ private fun notificationChannelState(context: Context): String {
         channel.importance >= NotificationManager.IMPORTANCE_LOW -> "Enabled (Low)"
         else -> "Low importance — controls may be hidden"
     }
+}
+
+@Composable
+private fun TabCustomizerDialog(
+    currentOrder: List<String>,
+    hiddenTabs: Set<String>,
+    defaultTab: String,
+    onDismiss: () -> Unit,
+    onSave: (List<String>, Set<String>, String) -> Unit
+) {
+    var order by remember(currentOrder) { mutableStateOf(currentOrder) }
+    var hidden by remember(hiddenTabs) { mutableStateOf(hiddenTabs) }
+    var selectedDefault by remember(defaultTab) { mutableStateOf(defaultTab) }
+
+    val tabTitles = mapOf(
+        "songs" to "Songs",
+        "albums" to "Albums",
+        "artists" to "Artists",
+        "folders" to "Folders",
+        "playlists" to "Playlists"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = {
+            Text(
+                text = "Customize Library Tabs",
+                style = MaterialTheme.typography.titleLarge,
+                color = LowspinTextPrimary
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Tap radio to set default start tab. Use arrows to reorder, eye to show/hide.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(14.dp))
+
+                order.forEachIndexed { index, tabKey ->
+                    val isHidden = tabKey in hidden
+                    val isDefault = selectedDefault == tabKey
+                    val title = tabTitles[tabKey] ?: tabKey.replaceFirstChar { it.uppercase() }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isDefault) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else MaterialTheme.colorScheme.surface.copy(alpha = 0.50f)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                selectedDefault = tabKey
+                                if (tabKey in hidden) {
+                                    hidden = hidden - tabKey
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isDefault) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked,
+                                contentDescription = "Default tab",
+                                tint = if (isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = if (isDefault) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (isHidden) LowspinTextMuted else LowspinTextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        IconButton(
+                            onClick = {
+                                if (index > 0) {
+                                    val mutable = order.toMutableList()
+                                    val item = mutable.removeAt(index)
+                                    mutable.add(index - 1, item)
+                                    order = mutable
+                                }
+                            },
+                            enabled = index > 0,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowUpward,
+                                contentDescription = "Move up",
+                                tint = if (index > 0) LowspinTextPrimary else LowspinTextMuted.copy(alpha = 0.4f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                if (index < order.lastIndex) {
+                                    val mutable = order.toMutableList()
+                                    val item = mutable.removeAt(index)
+                                    mutable.add(index + 1, item)
+                                    order = mutable
+                                }
+                            },
+                            enabled = index < order.lastIndex,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDownward,
+                                contentDescription = "Move down",
+                                tint = if (index < order.lastIndex) LowspinTextPrimary else LowspinTextMuted.copy(alpha = 0.4f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val newHidden = hidden.toMutableSet()
+                                if (isHidden) {
+                                    newHidden.remove(tabKey)
+                                } else {
+                                    // Ensure at least one tab remains visible
+                                    if (order.size - hidden.size > 1) {
+                                        newHidden.add(tabKey)
+                                        if (selectedDefault == tabKey) {
+                                            selectedDefault = order.firstOrNull { it != tabKey && it !in newHidden } ?: "songs"
+                                        }
+                                    }
+                                }
+                                hidden = newHidden
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                contentDescription = if (isHidden) "Unhide tab" else "Hide tab",
+                                tint = if (isHidden) LowspinTextMuted else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                TextButton(
+                    onClick = {
+                        order = com.lowspin.app.ui.settings.AppearanceSettings.DEFAULT_LIBRARY_TABS
+                        hidden = emptySet()
+                        selectedDefault = "songs"
+                    }
+                ) {
+                    Text("Reset to Defaults", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalDefault = if (selectedDefault !in hidden) selectedDefault
+                        else order.firstOrNull { it !in hidden } ?: "songs"
+                    onSave(order, hidden, finalDefault)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = LowspinOnAccent
+                )
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }

@@ -62,6 +62,37 @@ class PlaylistViewModel(
         viewModelScope.launch { repository.renamePlaylist(playlistId, name) }
     }
 
+    fun updateCover(customCoverUri: String?, gradientColorIndex: Int?) {
+        viewModelScope.launch { repository.updateCover(playlistId, customCoverUri, gradientColorIndex) }
+    }
+
+    fun setCustomCoverFromUri(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val coversDir = java.io.File(context.filesDir, "playlist_covers").apply { mkdirs() }
+                val coverFile = java.io.File(coversDir, "cover_${playlistId}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    coverFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                repository.updateCover(playlistId, coverFile.toURI().toString(), null)
+            }.onFailure {
+                repository.updateCover(playlistId, uri.toString(), null)
+            }
+        }
+    }
+
+    fun resetToMosaic(context: android.content.Context) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val coverFile = java.io.File(java.io.File(context.filesDir, "playlist_covers"), "cover_${playlistId}.jpg")
+                if (coverFile.exists()) coverFile.delete()
+            }
+            repository.updateCover(playlistId, null, null)
+        }
+    }
+
     fun delete(onDeleted: () -> Unit) {
         viewModelScope.launch {
             repository.deletePlaylist(playlistId)

@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AllInclusive
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -70,6 +72,8 @@ fun SongOptionsSheet(
     onAddToPlaylist: (Long) -> Unit,
     onCreatePlaylist: (String) -> Unit,
     onShowInfo: (() -> Unit)? = null,
+    onABRepeat: (() -> Unit)? = null,
+    onEditTags: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onRemoveFromLibrary: (() -> Unit)? = null
 ) {
@@ -172,6 +176,20 @@ fun SongOptionsSheet(
                         icon = Icons.Rounded.Info,
                         label = "Track info & audio specs",
                         onClick = onShowInfo
+                    )
+                }
+                if (onABRepeat != null) {
+                    SheetActionRow(
+                        icon = Icons.Rounded.AllInclusive,
+                        label = "A-B loop section tool",
+                        onClick = onABRepeat
+                    )
+                }
+                if (onEditTags != null) {
+                    SheetActionRow(
+                        icon = Icons.Rounded.EditNote,
+                        label = "Edit audio tags & metadata",
+                        onClick = onEditTags
                     )
                 }
                 if (onRemoveFromPlaylist != null) {

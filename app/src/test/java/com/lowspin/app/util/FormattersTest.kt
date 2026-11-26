@@ -28,6 +28,15 @@ class FormattersTest {
     }
 
     @Test
+    fun formatDurationWithMillis_formatsMilliseconds() {
+        assertEquals("0:00.0", formatDurationWithMillis(0L))
+        assertEquals("0:00.0", formatDurationWithMillis(-500L))
+        assertEquals("0:05.3", formatDurationWithMillis(5_340L))
+        assertEquals("1:23.7", formatDurationWithMillis(83_780L))
+        assertEquals("1:02:03.4", formatDurationWithMillis(3723_400L))
+    }
+
+    @Test
     fun formatTotalDuration_handlesSubMinute() {
         assertEquals("Less than a minute", formatTotalDuration(0L))
         assertEquals("Less than a minute", formatTotalDuration(30_000L))

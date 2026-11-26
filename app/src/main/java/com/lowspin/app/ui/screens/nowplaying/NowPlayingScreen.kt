@@ -38,7 +38,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -94,7 +96,9 @@ import com.lowspin.app.data.lyrics.Lyrics
 import com.lowspin.app.media.PlayerUiState
 import com.lowspin.app.ui.components.AlbumArtImage
 import com.lowspin.app.ui.components.AudioVisualizer
+import com.lowspin.app.ui.components.FluidMeshBackground
 import com.lowspin.app.ui.components.TurntableVinyl
+import com.lowspin.app.ui.components.WaveformSeekBar
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinTextPrimary
@@ -122,7 +126,10 @@ fun NowPlayingScreen(
     onSpeedClick: () -> Unit = {},
     onEqualizerClick: () -> Unit = {},
     onQueueClick: () -> Unit = {},
-    onSongInfoClick: () -> Unit = {}
+    onSongInfoClick: () -> Unit = {},
+    loopRange: Pair<Long, Long>? = null,
+    onABRepeatClick: () -> Unit = {},
+    onCarModeClick: () -> Unit = {}
 ) {
     val song = state.currentSong ?: return
     val appearance = LocalAppearance.current
@@ -134,6 +141,8 @@ fun NowPlayingScreen(
     val reduceMotion by appearance.reduceMotion.collectAsStateWithLifecycle()
     val ambientGlow by appearance.ambientGlow.collectAsStateWithLifecycle()
     val keepScreenOn by appearance.keepScreenOn.collectAsStateWithLifecycle()
+    val waveformSeekbar by appearance.waveformSeekbar.collectAsStateWithLifecycle()
+    val fluidMeshLyrics by appearance.fluidMeshLyrics.collectAsStateWithLifecycle()
 
     val view = LocalView.current
     DisposableEffect(keepScreenOn) {
@@ -242,6 +251,20 @@ fun NowPlayingScreen(
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                IconButton(onClick = onABRepeatClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.AllInclusive,
+                        contentDescription = "A-B Loop Section",
+                        tint = if (loopRange != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onCarModeClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.DirectionsCar,
+                        contentDescription = "Car Mode",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 IconButton(onClick = {
                     runCatching {
                         val intent = Intent(context, com.lowspin.app.BubbleActivity::class.java).apply {
@@ -295,12 +318,22 @@ fun NowPlayingScreen(
                 }
 
                 if (showLyrics && lyrics != null) {
-                    LyricsCard(
-                        lyrics = lyrics,
-                        positionMs = state.positionMs,
-                        isPlaying = state.isPlaying,
-                        onSeek = onSeek
-                    )
+                    Box(modifier = Modifier.fillMaxSize(0.96f), contentAlignment = Alignment.Center) {
+                        if (fluidMeshLyrics) {
+                            FluidMeshBackground(
+                                dominantColor = dominant,
+                                reduceMotion = reduceMotion,
+                                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            )
+                        }
+                        LyricsCard(
+                            lyrics = lyrics,
+                            positionMs = state.positionMs,
+                            isPlaying = state.isPlaying,
+                            onSeek = onSeek,
+                            transparentBackground = fluidMeshLyrics
+                        )
+                    }
                 } else if (turntableMode) {
                     TurntableVinyl(
                         songId = song.id,
@@ -464,7 +497,17 @@ fun NowPlayingScreen(
             }
 
             // Seek Bar
-            SeekBar(state = state, onSeek = onSeek)
+            if (waveformSeekbar) {
+                WaveformSeekBar(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    songId = song.id,
+                    loopRange = loopRange,
+                    onSeek = onSeek
+                )
+            } else {
+                SeekBar(state = state, onSeek = onSeek)
+            }
 
             // Playback Transport Controls
             Row(
@@ -595,7 +638,8 @@ private fun LyricsCard(
     lyrics: Lyrics,
     positionMs: Long,
     isPlaying: Boolean,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    transparentBackground: Boolean = false
 ) {
     val appearance = LocalAppearance.current
     val context = LocalContext.current
@@ -618,9 +662,12 @@ private fun LyricsCard(
 
     Box(
         modifier = Modifier
-            .fillMaxSize(0.96f)
+            .fillMaxSize()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
+            .background(
+                if (transparentBackground) Color.Transparent
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+            )
             .padding(14.dp)
     ) {
         Column(Modifier.fillMaxSize()) {

@@ -67,6 +67,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lowspin.app.ui.settings.LocalAppearance
 import kotlinx.coroutines.launch
 import com.lowspin.app.data.db.AlbumSummary
 import com.lowspin.app.data.db.ArtistSummary
@@ -114,7 +116,19 @@ fun LibraryScreen(
     onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)? = null
 ) {
     val scanning = scanState is ScanState.Scanning || scanState is ScanState.Enriching
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val appearance = LocalAppearance.current
+    val tabsOrder by appearance.libraryTabsOrder.collectAsStateWithLifecycle()
+    val hiddenTabs by appearance.hiddenLibraryTabs.collectAsStateWithLifecycle()
+    val defaultTab by appearance.defaultLibraryTab.collectAsStateWithLifecycle()
+
+    val visibleTabs = remember(tabsOrder, hiddenTabs) {
+        val filtered = tabsOrder.filter { it !in hiddenTabs }
+        if (filtered.isEmpty()) listOf("songs") else filtered
+    }
+
+    var selectedTabKey by rememberSaveable(visibleTabs, defaultTab) {
+        mutableStateOf(if (defaultTab in visibleTabs) defaultTab else visibleTabs.first())
+    }
     var menuOpen by remember { mutableStateOf(false) }
     val filteredCount = (scanState as? ScanState.Complete)?.filteredCount ?: 0
 
@@ -143,11 +157,15 @@ fun LibraryScreen(
             FilteredBanner(count = filteredCount, onManage = onManageFolders)
         }
 
-        LibraryTabs(selected = tab, onSelect = { tab = it })
+        LibraryTabs(
+            visibleTabs = visibleTabs,
+            selectedKey = selectedTabKey,
+            onSelect = { selectedTabKey = it }
+        )
 
         Box(Modifier.weight(1f)) {
-            when (tab) {
-                0 -> SongsTab(
+            when (selectedTabKey) {
+                "songs" -> SongsTab(
                     songs = songs,
                     scanState = scanState,
                     currentSongId = currentSongId,
@@ -155,7 +173,7 @@ fun LibraryScreen(
                     onSongOptions = onSongOptions,
                     onRefresh = onRefresh
                 )
-                1 -> PlaylistsTab(
+                "playlists" -> PlaylistsTab(
                     playlists = playlists,
                     songs = songs,
                     likedCount = likedCount,
@@ -165,17 +183,25 @@ fun LibraryScreen(
                     onLikedClick = onLikedClick,
                     onCreatePlaylist = onCreatePlaylist
                 )
-                2 -> AlbumsTab(
+                "albums" -> AlbumsTab(
                     albums = albums,
                     onAlbumClick = onAlbumClick
                 )
-                3 -> ArtistsTab(
+                "artists" -> ArtistsTab(
                     artists = artists,
                     onArtistClick = onArtistClick
                 )
-                4 -> FoldersTab(
+                "folders" -> FoldersTab(
                     folders = folders,
                     onFolderClick = onFolderClick
+                )
+                else -> SongsTab(
+                    songs = songs,
+                    scanState = scanState,
+                    currentSongId = currentSongId,
+                    onSongClick = onSongClick,
+                    onSongOptions = onSongOptions,
+                    onRefresh = onRefresh
                 )
             }
         }
@@ -351,7 +377,18 @@ private fun LibraryHeader(
 }
 
 @Composable
-private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
+private fun LibraryTabs(
+    visibleTabs: List<String>,
+    selectedKey: String,
+    onSelect: (String) -> Unit
+) {
+    val tabTitles = mapOf(
+        "songs" to "Songs",
+        "playlists" to "Playlists",
+        "albums" to "Albums",
+        "artists" to "Artists",
+        "folders" to "Folders"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -359,11 +396,14 @@ private fun LibraryTabs(selected: Int, onSelect: (Int) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        TabPill(label = "Songs", selected = selected == 0, onClick = { onSelect(0) })
-        TabPill(label = "Playlists", selected = selected == 1, onClick = { onSelect(1) })
-        TabPill(label = "Albums", selected = selected == 2, onClick = { onSelect(2) })
-        TabPill(label = "Artists", selected = selected == 3, onClick = { onSelect(3) })
-        TabPill(label = "Folders", selected = selected == 4, onClick = { onSelect(4) })
+        visibleTabs.forEach { tabKey ->
+            val label = tabTitles[tabKey] ?: tabKey.replaceFirstChar { it.uppercase() }
+            TabPill(
+                label = label,
+                selected = selectedKey == tabKey,
+                onClick = { onSelect(tabKey) }
+            )
+        }
     }
 }
 
@@ -613,6 +653,8 @@ private fun PlaylistsTab(
                 songCount = playlist.songCount,
                 artSongId = playlist.artSongId,
                 seed = playlist.name,
+                customCoverUri = playlist.customCoverUri,
+                gradientColorIndex = playlist.gradientColorIndex,
                 onClick = { onPlaylistClick(playlist.id) },
                 modifier = Modifier.animateItem()
             )

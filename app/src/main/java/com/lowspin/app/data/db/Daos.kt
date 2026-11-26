@@ -87,6 +87,26 @@ interface SongDao {
     @Query("UPDATE songs SET metadataEnriched = 1 WHERE id = :id")
     suspend fun markEnrichmentAttempted(id: Long)
 
+    @Query(
+        """
+        UPDATE songs
+        SET title = :title,
+            artist = :artist,
+            album = :album,
+            trackNumber = :trackNumber,
+            year = :year
+        WHERE id = :id
+        """
+    )
+    suspend fun updateSongTags(
+        id: Long,
+        title: String,
+        artist: String,
+        album: String,
+        trackNumber: Int,
+        year: Int
+    )
+
     @Query("SELECT * FROM songs WHERE isLiked = 1 ORDER BY title COLLATE NOCASE ASC")
     fun observeLiked(): Flow<List<SongEntity>>
 
@@ -273,6 +293,9 @@ interface PlaylistDao {
     )
     suspend fun getSongIds(playlistId: Long): List<Long>
 
+    @Query("UPDATE playlists SET customCoverUri = :customCoverUri, gradientColorIndex = :gradientColorIndex, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateCover(id: Long, customCoverUri: String?, gradientColorIndex: Int?, updatedAt: Long)
+
     @Query(
         """
         SELECT p.id AS id,
@@ -282,7 +305,9 @@ interface PlaylistDao {
                COUNT(ps.songId) AS songCount,
                (SELECT ps2.songId FROM playlist_songs ps2
                 WHERE ps2.playlistId = p.id
-                ORDER BY ps2.position ASC LIMIT 1) AS artSongId
+                ORDER BY ps2.position ASC LIMIT 1) AS artSongId,
+               p.customCoverUri AS customCoverUri,
+               p.gradientColorIndex AS gradientColorIndex
         FROM playlists p
         LEFT JOIN playlist_songs ps ON p.id = ps.playlistId
         GROUP BY p.id
@@ -300,7 +325,9 @@ interface PlaylistDao {
                COUNT(ps.songId) AS songCount,
                (SELECT ps2.songId FROM playlist_songs ps2
                 WHERE ps2.playlistId = p.id
-                ORDER BY ps2.position ASC LIMIT 1) AS artSongId
+                ORDER BY ps2.position ASC LIMIT 1) AS artSongId,
+               p.customCoverUri AS customCoverUri,
+               p.gradientColorIndex AS gradientColorIndex
         FROM playlists p
         LEFT JOIN playlist_songs ps ON p.id = ps.playlistId
         WHERE p.name LIKE '%' || :query || '%'
@@ -387,4 +414,17 @@ interface RecentSearchDao {
 
     @Query("DELETE FROM recent_searches")
     suspend fun clear()
+}
+
+@Dao
+interface SongEqualizerDao {
+
+    @Query("SELECT * FROM song_equalizers WHERE songId = :songId")
+    suspend fun get(songId: Long): SongEqualizerEntity?
+
+    @Upsert
+    suspend fun upsert(entity: SongEqualizerEntity)
+
+    @Query("DELETE FROM song_equalizers WHERE songId = :songId")
+    suspend fun delete(songId: Long)
 }

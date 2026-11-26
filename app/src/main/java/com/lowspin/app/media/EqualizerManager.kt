@@ -120,6 +120,19 @@ class EqualizerManager(
         }
     }
 
+    fun applyNormalization(enabled: Boolean, gainMb: Int = 350) {
+        val le = loudnessEnhancer ?: return
+        runCatching {
+            if (enabled) {
+                le.enabled = true
+                val effectiveGain = maxOf(gainMb, settings.loudnessGain.value).coerceIn(0, 1000)
+                le.setTargetGain(effectiveGain)
+            } else {
+                applyLoudness(settings.enabled.value, settings.loudnessGain.value)
+            }
+        }
+    }
+
     fun getBands(): List<BandInfo> {
         val eq = equalizer
         if (eq == null) {

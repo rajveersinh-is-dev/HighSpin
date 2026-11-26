@@ -49,7 +49,9 @@ data class PlaylistEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val customCoverUri: String? = null,
+    val gradientColorIndex: Int? = null
 )
 
 @Entity(
@@ -140,4 +142,20 @@ data class HiddenSongEntity(
     val folderPath: String,
     val hiddenAt: Long
 )
+
+/**
+ * Dedicated per-song equalizer and DSP presets.
+ * Automatically restored whenever this track is played.
+ */
+@Entity(tableName = "song_equalizers")
+data class SongEqualizerEntity(
+    @PrimaryKey val songId: Long,
+    val presetIndex: Int,
+    val bassBoost: Int,
+    val virtualizer: Int,
+    val loudnessGain: Int,
+    val customBands: String?,
+    val updatedAt: Long
+)
+
 

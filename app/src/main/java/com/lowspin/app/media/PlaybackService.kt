@@ -3,9 +3,16 @@ package com.lowspin.app.media
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import android.os.Build
+import android.view.KeyEvent
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -100,6 +107,11 @@ class PlaybackService : MediaSessionService() {
     private var isFaceDown = false
     private var sensorListenerRegistered = false
     private var gestureWakeLock: android.os.PowerManager.WakeLock? = null
+    private var loopRangeA: Long? = null
+    private var loopRangeB: Long? = null
+    private var loopJob: Job? = null
+    private var lastSeekToLoopStart = 0L
+    private var noisyReceiver: BroadcastReceiver? = null
 
     private val container: com.lowspin.app.di.AppContainer
         get() = (application as LowspinApplication).container
@@ -140,6 +152,38 @@ class PlaybackService : MediaSessionService() {
                 smartShuffle.onPlayed(index)
                 persistProgress()
                 syncMediaSessionMetadata()
+
+                val songId = mediaItem?.mediaId?.toLongOrNull()
+                if (songId != null) {
+                    scope.launch {
+                        val songEq = container.database.songEqualizerDao().get(songId)
+                        if (songEq != null) {
+                            container.equalizerSettings.applySongEqualizer(songEq)
+                        } else {
+                            container.equalizerSettings.restoreGlobalEqualizer()
+                        }
+                    }
+                } else {
+                    container.equalizerSettings.restoreGlobalEqualizer()
+                }
+
+                updateVolumeNormalization(songId, player.duration.coerceAtLeast(0L))
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                val start = loopRangeA
+                val end = loopRangeB
+                if (start != null && end != null && newPosition.positionMs >= end) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastSeekToLoopStart > 250L) {
+                        lastSeekToLoopStart = now
+                        player.seekTo(start)
+                    }
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -184,6 +228,9 @@ class PlaybackService : MediaSessionService() {
         startPersistLoop()
         startLiveNotificationObserver()
         startGestureObserver()
+        registerHeadsetAndBluetoothReceiver()
+        startLoopChecker()
+        startLoopObserver()
     }
 
     private fun createNotificationChannel() {
@@ -274,6 +321,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         persistJob?.cancel()
+        loopJob?.cancel()
+        unregisterHeadsetAndBluetoothReceiver()
         updateGestureWakeLock(false)
         if (sensorListenerRegistered) {
             sensorListener?.let { sensorManager?.unregisterListener(it) }
@@ -292,7 +341,97 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    private fun startLoopObserver() {
+        scope.launch {
+            container.playbackController.loopRange.collect { range ->
+                loopRangeA = range?.first
+                loopRangeB = range?.second
+            }
+        }
+    }
+
+    private fun startLoopChecker() {
+        loopJob = scope.launch {
+            while (isActive) {
+                delay(75L)
+                if (::player.isInitialized && player.isPlaying) {
+                    val start = loopRangeA
+                    val end = loopRangeB
+                    if (start != null && end != null && player.currentPosition >= end) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastSeekToLoopStart > 250L) {
+                            lastSeekToLoopStart = now
+                            player.seekTo(start)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun registerHeadsetAndBluetoothReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    AudioManager.ACTION_AUDIO_BECOMING_NOISY,
+                    BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                        if (container.appearanceSettings.pauseOnHeadsetDisconnect.value) {
+                            if (::player.isInitialized && player.isPlaying) {
+                                player.playWhenReady = false
+                            }
+                        }
+                    }
+                    BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                        if (container.appearanceSettings.autoResumeBluetooth.value) {
+                            if (::player.isInitialized && !player.isPlaying && player.mediaItemCount > 0) {
+                                player.playWhenReady = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        noisyReceiver = receiver
+        runCatching {
+            ContextCompat.registerReceiver(
+                this,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_EXPORTED
+            )
+        }
+    }
+
+    private fun unregisterHeadsetAndBluetoothReceiver() {
+        noisyReceiver?.let {
+            runCatching { unregisterReceiver(it) }
+            noisyReceiver = null
+        }
+    }
+
+    private fun updateVolumeNormalization(songId: Long?, durationMs: Long) {
+        val enabled = container.appearanceSettings.volumeNormalization.value
+        if (enabled && songId != null) {
+            val gainMb = ReplayGainCalculator.computeTrackNormalization(songId, durationMs)
+            container.equalizerManager.applyNormalization(enabled = true, gainMb = gainMb)
+        } else {
+            container.equalizerManager.applyNormalization(enabled = false)
+        }
+    }
+
     private fun startEqualizerObserver() {
+        scope.launch {
+            container.appearanceSettings.volumeNormalization.collect { enabled ->
+                val songId = if (::player.isInitialized) player.currentMediaItem?.mediaId?.toLongOrNull() else null
+                val duration = if (::player.isInitialized) player.duration.coerceAtLeast(0L) else 0L
+                updateVolumeNormalization(songId, duration)
+            }
+        }
         scope.launch {
             container.equalizerSettings.enabled.collect {
                 container.equalizerManager.applyAll()
@@ -569,6 +708,90 @@ class PlaybackService : MediaSessionService() {
     }
 
     private inner class SessionCallback : MediaSession.Callback {
+        private var headsetHookPressCount = 0
+        private var headsetHookResetJob: Job? = null
+
+        override fun onMediaButtonEvent(
+            session: MediaSession,
+            controllerInfo: MediaSession.ControllerInfo,
+            intent: Intent
+        ): Boolean {
+            val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? KeyEvent
+            }
+            if (keyEvent != null && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                when (keyEvent.keyCode) {
+                    KeyEvent.KEYCODE_HEADSETHOOK -> {
+                        headsetHookPressCount++
+                        headsetHookResetJob?.cancel()
+                        headsetHookResetJob = scope.launch {
+                            delay(350L)
+                            if (::player.isInitialized) {
+                                when (headsetHookPressCount) {
+                                    1 -> {
+                                        if (player.isPlaying) player.pause() else player.play()
+                                    }
+                                    2 -> player.seekToNextMediaItem()
+                                    3 -> player.seekToPreviousMediaItem()
+                                    else -> {
+                                        if (player.isPlaying) player.pause() else player.play()
+                                    }
+                                }
+                            }
+                            headsetHookPressCount = 0
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                        if (::player.isInitialized) {
+                            if (player.isPlaying) player.pause() else player.play()
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                        if (::player.isInitialized) player.play()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        if (::player.isInitialized) player.pause()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_NEXT,
+                    KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD -> {
+                        if (::player.isInitialized) player.seekToNextMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                    KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD -> {
+                        if (::player.isInitialized) player.seekToPreviousMediaItem()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_STOP -> {
+                        if (::player.isInitialized) player.stop()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                        if (::player.isInitialized) {
+                            val newPos = (player.currentPosition + 15_000L).coerceAtMost(player.duration.coerceAtLeast(0L))
+                            player.seekTo(newPos)
+                        }
+                        return true
+                    }
+                    KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                        if (::player.isInitialized) {
+                            val newPos = (player.currentPosition - 15_000L).coerceAtLeast(0L)
+                            player.seekTo(newPos)
+                        }
+                        return true
+                    }
+                }
+            }
+            return super.onMediaButtonEvent(session, controllerInfo, intent)
+        }
+
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controllerInfo: MediaSession.ControllerInfo

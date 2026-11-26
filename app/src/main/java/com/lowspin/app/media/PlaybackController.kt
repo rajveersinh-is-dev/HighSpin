@@ -59,6 +59,9 @@ class PlaybackController(
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
+    private val _loopRange = MutableStateFlow<Pair<Long, Long>?>(null)
+    val loopRange: StateFlow<Pair<Long, Long>?> = _loopRange.asStateFlow()
+
     private var tickerJob: Job? = null
     private var playStatsJob: Job? = null
     private var lastRecordedSongId = -1L
@@ -71,6 +74,10 @@ class PlaybackController(
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val newId = mediaItem?.mediaId?.toLongOrNull()
+            if (newId != _state.value.currentSong?.id) {
+                clearLoopRange()
+            }
             syncState()
             onTrackStarted(mediaItem)
         }
@@ -257,6 +264,7 @@ class PlaybackController(
         controller?.currentMediaItem?.mediaId?.toLongOrNull() == songId
 
     fun playQueue(songs: List<SongEntity>, startIndex: Int, sourceLabel: String) {
+        clearLoopRange()
         val mediaController = controller
         if (mediaController == null) {
             // A tap that lands before the service binds should still start playback.
@@ -323,6 +331,35 @@ class PlaybackController(
         val safePosition = positionMs.coerceAtLeast(0L)
         controller?.seekTo(safePosition)
         _state.update { it.copy(positionMs = safePosition) }
+    }
+
+    fun setLoopRange(startMs: Long, endMs: Long) {
+        val start = startMs.coerceAtLeast(0L)
+        val end = endMs.coerceAtLeast(start + 100L)
+        _loopRange.value = Pair(start, end)
+        val current = _state.value.positionMs
+        if (current < start || current >= end) {
+            seekTo(start)
+        }
+    }
+
+    fun clearLoopRange() {
+        _loopRange.value = null
+    }
+
+    fun updateSongInCache(songId: Long, title: String, artist: String, album: String, trackNumber: Int, year: Int) {
+        val existing = songCache[songId] ?: return
+        val updated = existing.copy(
+            title = title,
+            artist = artist,
+            album = album,
+            trackNumber = trackNumber,
+            year = year
+        )
+        songCache[songId] = updated
+        if (_state.value.currentSong?.id == songId) {
+            _state.update { it.copy(currentSong = updated) }
+        }
     }
 
     fun setShuffle(enabled: Boolean) {
