@@ -472,4 +472,19 @@ class LiveNotificationTest {
         assertEquals(androidx.compose.ui.graphics.Color(0xFF000000), pureBlack.background)
         assertEquals(androidx.compose.ui.graphics.Color(0xFF000000), pureBlack.surface)
     }
+
+    @Test
+    fun bubbleActivity_pipActionsAndExtras_configuredCorrectly() {
+        assertEquals("EXTRA_START_PIP", com.lowspin.app.BubbleActivity.EXTRA_START_PIP)
+        assertEquals("com.lowspin.app.ACTION_PIP_PLAY_PAUSE", com.lowspin.app.BubbleActivity.ACTION_PIP_PLAY_PAUSE)
+        assertEquals("com.lowspin.app.ACTION_PIP_PREV", com.lowspin.app.BubbleActivity.ACTION_PIP_PREV)
+        assertEquals("com.lowspin.app.ACTION_PIP_NEXT", com.lowspin.app.BubbleActivity.ACTION_PIP_NEXT)
+    }
+
+    @Test
+    fun liveNotification_actionsAndConstants_definedCorrectly() {
+        assertEquals("com.lowspin.app.action.PLAY_PAUSE", HighSpinLiveNotificationProvider.ACTION_PLAY_PAUSE)
+        assertEquals("com.lowspin.app.action.NEXT", HighSpinLiveNotificationProvider.ACTION_NEXT)
+        assertEquals("com.lowspin.app.action.PREV", HighSpinLiveNotificationProvider.ACTION_PREV)
+    }
 }

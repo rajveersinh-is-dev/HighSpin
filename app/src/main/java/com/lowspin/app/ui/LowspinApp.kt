@@ -268,6 +268,12 @@ fun LowspinApp(container: AppContainer) {
             libraryViewModel.playQueue(list, index, "Search results")
         }
     }
+    val onPlayQueue = remember(libraryViewModel) {
+        { list: List<SongEntity>, index: Int, label: String ->
+            val safeIndex = index.coerceIn(0, list.lastIndex.coerceAtLeast(0))
+            libraryViewModel.playQueue(list, safeIndex, label)
+        }
+    }
     val onOpenOptions = remember { { song: SongEntity -> optionsSong = song } }
     val onBack = remember(navController, activity) {
         {
@@ -373,7 +379,8 @@ fun LowspinApp(container: AppContainer) {
                         onHiddenSongs = onOpenHidden,
                         onEqualizerClick = onOpenEqualizer,
                         onAbout = onOpenAbout,
-                        onSettings = onOpenSettings
+                        onSettings = onOpenSettings,
+                        onPlayQueue = onPlayQueue
                     )
                 }
                 composable("search") {

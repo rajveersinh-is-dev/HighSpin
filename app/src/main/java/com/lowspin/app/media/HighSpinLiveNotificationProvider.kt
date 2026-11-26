@@ -77,6 +77,10 @@ class HighSpinLiveNotificationProvider(
             "android.shortcut.conversation"
         )
 
+        const val ACTION_PLAY_PAUSE = "com.lowspin.app.action.PLAY_PAUSE"
+        const val ACTION_NEXT = "com.lowspin.app.action.NEXT"
+        const val ACTION_PREV = "com.lowspin.app.action.PREV"
+
         const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         const val EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText"
         const val EXTRA_SUBST_NAME = "android.substName"
@@ -250,7 +254,8 @@ class HighSpinLiveNotificationProvider(
             bubbleMetadata: NotificationCompat.BubbleMetadata?,
             platformBubble: Any?,
             sessionActivity: PendingIntent?,
-            shouldPost: Boolean
+            shouldPost: Boolean,
+            isPlaybackActive: Boolean = true
         ) {
             val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
             if (!shouldPost || bubbleMetadata == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -274,6 +279,31 @@ class HighSpinLiveNotificationProvider(
                     .addMessage("$title • $artist", System.currentTimeMillis(), person)
                     .setConversationTitle("Now Playing")
 
+                val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+
+                val prevIntent = PendingIntent.getService(
+                    context,
+                    101,
+                    Intent(context, PlaybackService::class.java).apply { action = ACTION_PREV },
+                    pendingFlags
+                )
+                val playPauseIntent = PendingIntent.getService(
+                    context,
+                    102,
+                    Intent(context, PlaybackService::class.java).apply { action = ACTION_PLAY_PAUSE },
+                    pendingFlags
+                )
+                val nextIntent = PendingIntent.getService(
+                    context,
+                    103,
+                    Intent(context, PlaybackService::class.java).apply { action = ACTION_NEXT },
+                    pendingFlags
+                )
+
                 val builder = NotificationCompat.Builder(context, targetChannel)
                     .setSmallIcon(R.drawable.ic_stat_vinyl)
                     .setContentTitle(title)
@@ -285,8 +315,12 @@ class HighSpinLiveNotificationProvider(
                     .setBubbleMetadata(bubbleMetadata)
                     .setOngoing(true)
                     .setShowWhen(true)
+                    .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .addAction(R.drawable.ic_stat_vinyl, "Prev", prevIntent)
+                    .addAction(R.drawable.ic_stat_vinyl, if (isPlaybackActive) "Pause" else "Play", playPauseIntent)
+                    .addAction(R.drawable.ic_stat_vinyl, "Next", nextIntent)
 
                 if (sessionActivity != null) {
                     builder.setContentIntent(sessionActivity)
@@ -297,14 +331,7 @@ class HighSpinLiveNotificationProvider(
 
                 val bubbleNotif = builder.build()
                 applyPromotedOngoingViaReflection(bubbleNotif, true)
-                applyNotificationInternalOverrides(
-                    target = bubbleNotif,
-                    channelId = targetChannel,
-                    shortcutId = PLAYBACK_SHORTCUT_ID,
-                    bubbleMetadata = platformBubble,
-                    clearGroup = true
-                )
-                bubbleNotif.flags = bubbleNotif.flags or Notification.FLAG_BUBBLE or Notification.FLAG_ONGOING_EVENT
+                bubbleNotif.flags = bubbleNotif.flags or Notification.FLAG_ONGOING_EVENT
 
                 nm.notify(BUBBLE_NOTIFICATION_ID, bubbleNotif)
             }
@@ -470,10 +497,7 @@ class HighSpinLiveNotificationProvider(
         val notification = rawNotification
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
-        var flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
-            flags = flags or Notification.FLAG_BUBBLE
-        }
+        val flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
         notification.flags = flags
 
         // 2. High priority transport category & public lockscreen visibility
@@ -506,19 +530,11 @@ class HighSpinLiveNotificationProvider(
             )
         }
 
-        // Unconditionally remove media3 groupKey and assign shortcut & bubble metadata extras
+        // Unconditionally remove media3 groupKey so Android 15 & OxygenOS 15 can promote it cleanly
         notification.extras.remove("android.support.groupKey")
-        notification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
-            notification.extras.putParcelable("android.support.bubbleMetadata", platformBubble)
-        }
-
-        // Guaranteed override of internal fields to satisfy promotable and bubble constraints
         applyNotificationInternalOverrides(
             target = notification,
             channelId = NOTIFICATION_CHANNEL_ID,
-            shortcutId = PLAYBACK_SHORTCUT_ID,
-            bubbleMetadata = platformBubble,
             clearGroup = true
         )
 
@@ -554,27 +570,42 @@ class HighSpinLiveNotificationProvider(
                 putBoolean(EXTRA_OPLUS_CAPSULE, shouldBeOngoing)
                 putBoolean(EXTRA_OPLUS_COM_CAPSULE, shouldBeOngoing)
                 putString(EXTRA_OPLUS_CAPSULE_TYPE, "music")
+                putString("oplus_capsule_type", "music")
+                putString("com.oplus.capsule.type", "music")
                 putBoolean("oplus_media", true)
                 putInt(EXTRA_OPLUS_CAPSULE_STATUS, if (shouldBeOngoing) 1 else 0)
+                putInt("oplus_capsule_state", if (shouldBeOngoing) 1 else 0)
+                putInt("com.oplus.capsule.status", if (shouldBeOngoing) 1 else 0)
                 putString(EXTRA_CAPSULE_TITLE, title)
                 putString(EXTRA_CAPSULE_CONTENT, artist)
+                putString("capsule_subcontent", album)
+                putString("oplus.capsule.title", title)
+                putString("oplus.capsule.content", artist)
+                putString("com.oplus.capsule.title", title)
+                putString("com.oplus.capsule.content", artist)
                 putBoolean(EXTRA_LIVE_NOTIFICATION, shouldBeOngoing)
+                putBoolean("live_notification", shouldBeOngoing)
+                putBoolean("is_live", shouldBeOngoing)
                 putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, shouldBeOngoing)
 
                 // Fluid Cloud / Pantanal service compatibility
                 putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, true)
                 putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, true)
                 putString(EXTRA_OPLUS_PANTANAL_TYPE, "music")
+                putString("com.oplus.pantanal.capsule.type", "music")
+                putInt("com.oplus.pantanal.capsule.status", if (shouldBeOngoing) 1 else 0)
 
                 // Icon and action for capsule
                 val sessionActivity = mediaSession.sessionActivity
                 if (sessionActivity != null) {
                     putParcelable(EXTRA_CAPSULE_ACTION, sessionActivity)
                     putParcelable(EXTRA_OPLUS_CAPSULE_ACTION, sessionActivity)
+                    putParcelable("com.oplus.capsule.action", sessionActivity)
                 }
                 val capsuleIcon = Icon.createWithResource(context, R.drawable.ic_stat_vinyl)
                 putParcelable(EXTRA_CAPSULE_ICON, capsuleIcon)
                 putParcelable(EXTRA_OPLUS_CAPSULE_ICON, capsuleIcon)
+                putParcelable("com.oplus.capsule.icon", capsuleIcon)
             } else {
                 putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false)
                 putBoolean(EXTRA_OPLUS_ONGOING, false)
@@ -605,7 +636,8 @@ class HighSpinLiveNotificationProvider(
             bubbleMetadata = bubbleMetadata,
             platformBubble = platformBubble,
             sessionActivity = mediaSession.sessionActivity,
-            shouldPost = shouldBeOngoing && isLiveEnabled
+            shouldPost = shouldBeOngoing && isLiveEnabled,
+            isPlaybackActive = isPlaybackActive
         )
 
         return MediaNotification(mediaNotification.notificationId, notification)

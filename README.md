@@ -10,18 +10,21 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 Grab the ready-to-install APK directly from GitHub Releases:
 
-- **[Download HighSpin Release APK (v2.3.9)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.89 MB - Ultra lightweight, R8 minified & resource-shrunk)
-- **[Download HighSpin Debug APK (v2.3.9)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+- **[Download HighSpin Release APK (v2.4.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.89 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.4.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
 
 ---
 
-## ✨ What's New in v2.3.9
+## ✨ What's New in v2.4.0
 
-### 🔔 Android 15 & OnePlus OxygenOS 15 Live Alerts & Floating Bubble Fix
+### 🫧 Picture-in-Picture Floating Mini Player Bubble & OxygenOS 15 Live Alerts
+- **Hardware-Guaranteed Floating Mini Player:** Added full Picture-in-Picture (`supportsPictureInPicture="true"`) to `BubbleActivity` with 1:1 vinyl square aspect ratio, remote system transport actions (Previous, Play/Pause, Next), and auto-enter on swipe up/minimize (`setAutoEnterEnabled(true)`). Guarantees a persistent floating bubble on 100% of Android 8.0–15 devices including OnePlus OxygenOS 15!
+- **Channel Tombstone Fix:** Eliminated destructive conversation channel deletion in `PlaybackService`, preventing channel corruption and enabling proper conversation bubble registration on Android 11–15.
+- **Smart Playlist Queue Playback:** Fixed "Recently Added" and "Most Played" cards to properly sort and play their dedicated queues instead of default library order.
 - **Dual-Channel Architecture:** Overcomes Android 15's strict system separation between `MediaStyle` (required by `MediaDataManager` and OxygenOS 15 Fluid Cloud) and `MessagingStyle` (required by Android 11–15 `BubbleExtractor`).
   - **MediaStyle Channel (ID 1001):** Retains 100% compliant media session decoration, capsule metadata (`oplus_capsule`), and `lyricInfo` payload for the status bar live pill, shelf, and lock screen focus alerts on OnePlus OxygenOS 15.
   - **Companion Bubble Notification (ID 1002):** Automatically posts a conversation-shortcut-backed `MessagingStyle` bubble notification to `CONVERSATION_CHANNEL_ID` during playback, allowing Android 15 users to expand HighSpin into a native floating bubble overlay anywhere on the screen!
-- **Registered Floating Mini Player Bubble:** Enhanced `BubbleActivity` with exported intent filters and direct floating bubble launch action from Settings and Now Playing.
+- **Registered Floating Mini Player Bubble:** Enhanced `BubbleActivity` with exported intent filters, direct floating bubble launch action from Settings and Now Playing, and one-tap "Float Mini Player" header button.
 
 ### 🖤 AMOLED Pure Black & Aesthetic Enhancements
 - **True AMOLED Pure Black Mode:** `#000000` pitch black background and surfaces with high-contrast accents, reducing OLED power consumption to absolute zero on dark pixels.
@@ -30,7 +33,7 @@ Grab the ready-to-install APK directly from GitHub Releases:
 - **Dynamic Waveform Visual Seekbar:** 40 responsive amplitude bars with glowing active segments and live drag scrubbing.
 - **Audiophile Hi-Res & Codec Badges:** Dynamic golden "HI-RES" and codec pills (FLAC, WAV, AAC, MP3, OPUS) calculated on the fly.
 - **A-Z Fast Alphabet Scrollbar:** Seamless alphabet scrub bar with floating letter preview bubble on Songs tab.
-- **Smart Dynamic Playlists:** Dedicated "Recently Added" and "Most Played" auto-generated collections.
+- **Smart Dynamic Playlists:** Dedicated "Recently Added" and "Most Played" auto-generated collections with functional playback queues.
 - **Loudness & Dynamics Booster DSP:** Android `LoudnessEnhancer` audiofx integration for clean hardware gain boost up to +12 dB.
 - **Motion Gestures:** Shake-to-Skip (with haptic feedback) and Flip Face-Down to Pause using low-power hardware accelerometer.
 - **Save Queue as Playlist:** One-tap dialog to save the entire play queue into a new custom playlist.

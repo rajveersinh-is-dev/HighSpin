@@ -59,6 +59,7 @@
             android:allowEmbedded="true"
             android:resizeableActivity="true"
             android:documentLaunchMode="always"
+            android:supportsPictureInPicture="true"
             android:theme="@style/Theme.Lowspin">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

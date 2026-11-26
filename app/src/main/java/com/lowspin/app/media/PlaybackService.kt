@@ -90,10 +90,20 @@ class PlaybackService : MediaSessionService() {
                 }
                 smartShuffle.onPlayed(index)
                 persistProgress()
+                syncMediaSessionMetadata()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) persistProgress()
+                syncMediaSessionMetadata()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                syncMediaSessionMetadata()
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                syncMediaSessionMetadata()
             }
         })
 
@@ -113,6 +123,8 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(sessionActivity)
             .setCallback(SessionCallback())
             .build()
+
+        syncMediaSessionMetadata()
 
         container.equalizerManager.attach(player.audioSessionId)
         startEqualizerObserver()
@@ -159,26 +171,22 @@ class PlaybackService : MediaSessionService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val convChannelId = HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
             val existingConv = manager.getNotificationChannel(convChannelId)
-            if (existingConv != null && (existingConv.importance < NotificationManager.IMPORTANCE_HIGH || !existingConv.canBubble())) {
-                runCatching {
-                    manager.deleteNotificationChannel(convChannelId)
+            if (existingConv == null) {
+                val conversationChannel = NotificationChannel(
+                    convChannelId,
+                    "Now Playing Bubble",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "HighSpin playback floating bubble conversation"
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                    setShowBadge(true)
+                    enableVibration(false)
+                    setSound(null, null)
+                    setAllowBubbles(true)
+                    setConversationId(NOTIFICATION_CHANNEL_ID, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
                 }
+                manager.createNotificationChannel(conversationChannel)
             }
-
-            val conversationChannel = NotificationChannel(
-                convChannelId,
-                "Now Playing",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "HighSpin playback bubble conversation"
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                setShowBadge(true)
-                enableVibration(false)
-                setSound(null, null)
-                setAllowBubbles(true)
-                setConversationId(NOTIFICATION_CHANNEL_ID, HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID)
-            }
-            manager.createNotificationChannel(conversationChannel)
         }
     }
 
@@ -189,6 +197,27 @@ class PlaybackService : MediaSessionService() {
         if (!player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            HighSpinLiveNotificationProvider.ACTION_PLAY_PAUSE -> {
+                if (::player.isInitialized) {
+                    player.playWhenReady = !player.playWhenReady
+                }
+            }
+            HighSpinLiveNotificationProvider.ACTION_NEXT -> {
+                if (::player.isInitialized && player.mediaItemCount > 0) {
+                    player.seekToNextMediaItem()
+                }
+            }
+            HighSpinLiveNotificationProvider.ACTION_PREV -> {
+                if (::player.isInitialized && player.mediaItemCount > 0) {
+                    player.seekToPreviousMediaItem()
+                }
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
@@ -432,5 +461,103 @@ class PlaybackService : MediaSessionService() {
             }
             return future
         }
+    }
+
+    private fun syncMediaSessionMetadata() {
+        val session = mediaSession ?: return
+        if (!::player.isInitialized) return
+
+        val metadata = player.mediaMetadata
+        val title = metadata.title?.toString()?.takeIf { it.isNotBlank() } ?: "HighSpin"
+        val artist = metadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: "Local Audio"
+        val album = metadata.albumTitle?.toString()?.takeIf { it.isNotBlank() } ?: "HighSpin"
+        val currentMediaItem = player.currentMediaItem
+        val songId = currentMediaItem?.mediaId?.toLongOrNull() ?: 0L
+        val duration = player.duration.coerceAtLeast(0L)
+        val isPlaying = player.isPlaying
+
+        val lyricJson = metadata.extras?.getString("lyricInfo")
+            ?: currentMediaItem?.mediaMetadata?.extras?.getString("lyricInfo")
+            ?: buildLyricInfoJson(title, artist, album, songId)
+
+        val sessionExtras = android.os.Bundle().apply {
+            putString("lyricInfo", lyricJson)
+            putString("lyric_info", lyricJson)
+            putString("oplus_lyric_info", lyricJson)
+            putString("songName", title)
+            putString("artist", artist)
+            putString("album", album)
+            putBoolean("is_live_media", true)
+            putBoolean("oplus_media", true)
+            putBoolean("oplus.ongoing", isPlaying)
+            putBoolean("oplus_capsule", isPlaying)
+            putBoolean("com.oplus.capsule", isPlaying)
+            putString("oplus.capsule.type", "music")
+            putString("oplus_capsule_type", "music")
+            putString("com.oplus.capsule.type", "music")
+            putInt("oplus_capsule_status", if (isPlaying) 1 else 0)
+            putInt("oplus_capsule_state", if (isPlaying) 1 else 0)
+            putInt("com.oplus.capsule.status", if (isPlaying) 1 else 0)
+            putString("capsule_title", title)
+            putString("capsule_content", artist)
+            putString("capsule_subcontent", album)
+            putBoolean("oplus.pantanal.support", true)
+            putBoolean("com.oplus.pantanal.support", true)
+            putString("oplus.pantanal.type", "music")
+            putInt("com.oplus.pantanal.capsule.status", if (isPlaying) 1 else 0)
+        }
+
+        session.setSessionExtras(sessionExtras)
+
+        // Directly set platform android.media.session.MediaSession metadata and extras for OxygenOS 15 OplusMediaController
+        runCatching {
+            findFrameworkMediaSession(session)?.let { fwkSession ->
+                val fwkMetadata = android.media.MediaMetadata.Builder()
+                    .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, artist)
+                    .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, album)
+                    .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, duration)
+                    .putString("lyricInfo", lyricJson)
+                    .putString("lyric_info", lyricJson)
+                    .putString("oplus_lyric_info", lyricJson)
+                    .putString("songName", title)
+                    .putString("artist", artist)
+                    .putString("album", album)
+                    .build()
+                fwkSession.setMetadata(fwkMetadata)
+                fwkSession.setExtras(sessionExtras)
+            }
+        }
+    }
+
+    private fun findFrameworkMediaSession(obj: Any?): android.media.session.MediaSession? {
+        if (obj == null) return null
+        if (obj is android.media.session.MediaSession) return obj
+
+        var currClass: Class<*>? = obj.javaClass
+        while (currClass != null && currClass != Any::class.java) {
+            for (field in currClass.declaredFields) {
+                if (android.media.session.MediaSession::class.java.isAssignableFrom(field.type)) {
+                    field.isAccessible = true
+                    val found = field.get(obj) as? android.media.session.MediaSession
+                    if (found != null) return found
+                }
+            }
+            currClass = currClass.superclass
+        }
+
+        for (nestedName in listOf("impl", "mediaSessionCompat", "mImpl", "mSessionFwk")) {
+            val nestedObj = runCatching {
+                HighSpinLiveNotificationProvider.findDeclaredField(obj.javaClass, nestedName)?.let { field ->
+                    field.isAccessible = true
+                    field.get(obj)
+                }
+            }.getOrNull()
+            if (nestedObj != null) {
+                val found = findFrameworkMediaSession(nestedObj)
+                if (found != null) return found
+            }
+        }
+        return null
     }
 }

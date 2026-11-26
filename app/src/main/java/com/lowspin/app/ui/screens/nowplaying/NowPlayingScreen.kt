@@ -246,6 +246,7 @@ fun NowPlayingScreen(
                     runCatching {
                         val intent = Intent(context, com.lowspin.app.BubbleActivity::class.java).apply {
                             action = Intent.ACTION_VIEW
+                            putExtra(com.lowspin.app.BubbleActivity.EXTRA_START_PIP, true)
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
                         }
                         context.startActivity(intent)

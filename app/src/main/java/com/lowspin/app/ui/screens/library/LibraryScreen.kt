@@ -110,7 +110,8 @@ fun LibraryScreen(
     onHiddenSongs: () -> Unit,
     onEqualizerClick: () -> Unit,
     onAbout: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)? = null
 ) {
     val scanning = scanState is ScanState.Scanning || scanState is ScanState.Enriching
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -159,6 +160,7 @@ fun LibraryScreen(
                     songs = songs,
                     likedCount = likedCount,
                     onSongClick = onSongClick,
+                    onPlayQueue = onPlayQueue,
                     onPlaylistClick = onPlaylistClick,
                     onLikedClick = onLikedClick,
                     onCreatePlaylist = onCreatePlaylist
@@ -525,6 +527,7 @@ private fun PlaylistsTab(
     songs: List<SongEntity>,
     likedCount: Int,
     onSongClick: (SongEntity) -> Unit,
+    onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)?,
     onPlaylistClick: (Long) -> Unit,
     onLikedClick: () -> Unit,
     onCreatePlaylist: () -> Unit
@@ -541,32 +544,48 @@ private fun PlaylistsTab(
             )
         }
         item(key = "recent", contentType = "recent") {
-            val recentCount = remember(songs) {
-                val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 3600 * 1000)
-                songs.count { it.dateAdded * 1000L > thirtyDaysAgo }
+            val thirtyDaysAgo = remember { System.currentTimeMillis() - (30L * 24 * 3600 * 1000) }
+            val recentSongs = remember(songs) {
+                songs.filter { it.dateAdded * 1000L > thirtyDaysAgo }.sortedByDescending { it.dateAdded }
             }
             SmartPlaylistCard(
                 title = "Recently Added",
-                subtitle = if (recentCount == 1) "1 song added recently" else "$recentCount songs added recently",
+                subtitle = if (recentSongs.size == 1) "1 song added recently" else "${recentSongs.size} songs added recently",
                 icon = Icons.Rounded.Schedule,
                 gradientColors = listOf(Color(0xFF00C6FF), Color(0xFF0072FF)),
                 onClick = {
-                    val recentSong = songs.maxByOrNull { it.dateAdded }
-                    if (recentSong != null) onSongClick(recentSong)
+                    if (recentSongs.isNotEmpty()) {
+                        if (onPlayQueue != null) {
+                            onPlayQueue(recentSongs, 0, "Recently Added")
+                        } else {
+                            onSongClick(recentSongs.first())
+                        }
+                    } else if (songs.isNotEmpty()) {
+                        onSongClick(songs.first())
+                    }
                 },
                 modifier = Modifier.animateItem()
             )
         }
         item(key = "most_played", contentType = "most_played") {
-            val mostPlayedCount = remember(songs) { songs.count { it.playCount > 0 } }
+            val mostPlayedSongs = remember(songs) {
+                songs.filter { it.playCount > 0 }.sortedByDescending { it.playCount }
+            }
             SmartPlaylistCard(
                 title = "Most Played",
-                subtitle = if (mostPlayedCount == 1) "1 song in rotation" else "$mostPlayedCount songs in rotation",
+                subtitle = if (mostPlayedSongs.size == 1) "1 song in rotation" else "${mostPlayedSongs.size} songs in rotation",
                 icon = Icons.Rounded.Star,
                 gradientColors = listOf(Color(0xFFFF512F), Color(0xFFDD2476)),
                 onClick = {
-                    val topSong = songs.maxByOrNull { it.playCount }
-                    if (topSong != null) onSongClick(topSong)
+                    if (mostPlayedSongs.isNotEmpty()) {
+                        if (onPlayQueue != null) {
+                            onPlayQueue(mostPlayedSongs, 0, "Most Played")
+                        } else {
+                            onSongClick(mostPlayedSongs.first())
+                        }
+                    } else if (songs.isNotEmpty()) {
+                        onSongClick(songs.first())
+                    }
                 },
                 modifier = Modifier.animateItem()
             )
