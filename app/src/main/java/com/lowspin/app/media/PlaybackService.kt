@@ -40,6 +40,52 @@ class PlaybackService : MediaSessionService() {
         const val NOTIFICATION_CHANNEL_ID = HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         const val FADE_DURATION_MS = 5_000L
         const val TIMER_TICK_MS = 250L
+
+        const val SHAKE_G_FORCE_THRESHOLD = 1.65f
+        const val SHAKE_DEBOUNCE_MS = 1200L
+        const val FLIP_Z_THRESHOLD = -6.5f
+        const val FLIP_PLANAR_MAX = 6.5f
+        const val FLIP_RESET_Z_THRESHOLD = -2.0f
+
+        fun isShakeGesture(gForce: Float): Boolean = gForce > SHAKE_G_FORCE_THRESHOLD
+
+        fun isFaceDownOrientation(x: Float, y: Float, z: Float): Boolean {
+            val planar = kotlin.math.sqrt((x * x + y * y).toDouble()).toFloat()
+            return z < FLIP_Z_THRESHOLD && planar < FLIP_PLANAR_MAX
+        }
+
+        fun isFaceDownReset(z: Float): Boolean = z > FLIP_RESET_Z_THRESHOLD
+
+        fun findFrameworkMediaSession(obj: Any?): android.media.session.MediaSession? {
+            if (obj == null) return null
+            if (obj is android.media.session.MediaSession) return obj
+
+            var currClass: Class<*>? = obj.javaClass
+            while (currClass != null && currClass != Any::class.java) {
+                for (field in currClass.declaredFields) {
+                    if (android.media.session.MediaSession::class.java.isAssignableFrom(field.type)) {
+                        field.isAccessible = true
+                        val found = runCatching { field.get(obj) as? android.media.session.MediaSession }.getOrNull()
+                        if (found != null) return found
+                    }
+                }
+                currClass = currClass.superclass
+            }
+
+            for (nestedName in listOf("impl", "sessionCompat", "mediaSessionCompat", "mImpl", "mSessionFwk", "mSession")) {
+                val nestedObj = runCatching {
+                    HighSpinLiveNotificationProvider.findDeclaredField(obj.javaClass, nestedName)?.let { field ->
+                        field.isAccessible = true
+                        field.get(obj)
+                    }
+                }.getOrNull()
+                if (nestedObj != null && nestedObj !== obj) {
+                    val found = findFrameworkMediaSession(nestedObj)
+                    if (found != null) return found
+                }
+            }
+            return null
+        }
     }
 
     private var mediaSession: MediaSession? = null
@@ -51,6 +97,9 @@ class PlaybackService : MediaSessionService() {
     private var accelerometer: android.hardware.Sensor? = null
     private var sensorListener: android.hardware.SensorEventListener? = null
     private var lastShakeTimestamp = 0L
+    private var isFaceDown = false
+    private var sensorListenerRegistered = false
+    private var gestureWakeLock: android.os.PowerManager.WakeLock? = null
 
     private val container: com.lowspin.app.di.AppContainer
         get() = (application as LowspinApplication).container
@@ -96,14 +145,17 @@ class PlaybackService : MediaSessionService() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) persistProgress()
                 syncMediaSessionMetadata()
+                updateGestureState()
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 syncMediaSessionMetadata()
+                updateGestureState()
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 syncMediaSessionMetadata()
+                updateGestureState()
             }
         })
 
@@ -222,7 +274,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         persistJob?.cancel()
-        sensorListener?.let { sensorManager?.unregisterListener(it) }
+        updateGestureWakeLock(false)
+        if (sensorListenerRegistered) {
+            sensorListener?.let { sensorManager?.unregisterListener(it) }
+            sensorListenerRegistered = false
+        }
         runCatching {
             getSystemService(NotificationManager::class.java)
                 ?.cancel(HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
@@ -303,17 +359,88 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private fun triggerHapticFeedback(durationMs: Long = 45L) {
+        runCatching {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(android.os.VibratorManager::class.java)?.defaultVibrator
+                    ?: getSystemService(android.os.Vibrator::class.java)
+            } else {
+                getSystemService(android.os.Vibrator::class.java)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(android.os.VibrationEffect.createOneShot(durationMs, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(durationMs)
+            }
+        }
+    }
+
+    private fun updateGestureWakeLock(needed: Boolean) {
+        runCatching {
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            if (gestureWakeLock == null && pm != null) {
+                gestureWakeLock = pm.newWakeLock(
+                    android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                    "highspin:sensor_gestures"
+                ).apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (needed) {
+                if (gestureWakeLock?.isHeld != true) {
+                    gestureWakeLock?.acquire()
+                }
+            } else {
+                if (gestureWakeLock?.isHeld == true) {
+                    gestureWakeLock?.release()
+                }
+            }
+        }
+    }
+
+    private fun updateGestureState() {
+        val appearance = container.appearanceSettings
+        val gesturesEnabled = appearance.shakeToSkip.value || appearance.flipToPause.value
+        val listener = sensorListener
+        if (gesturesEnabled && listener != null) {
+            if (!sensorListenerRegistered) {
+                accelerometer?.let { sensor ->
+                    sensorManager?.registerListener(
+                        listener,
+                        sensor,
+                        android.hardware.SensorManager.SENSOR_DELAY_GAME
+                    )
+                    sensorListenerRegistered = true
+                }
+            }
+        } else {
+            if (sensorListenerRegistered) {
+                sensorListener?.let { sensorManager?.unregisterListener(it) }
+                sensorListenerRegistered = false
+            }
+            isFaceDown = false
+        }
+
+        val isPlaying = ::player.isInitialized && (player.isPlaying || player.playWhenReady)
+        val wakeLockNeeded = gesturesEnabled && isPlaying
+        updateGestureWakeLock(wakeLockNeeded)
+    }
+
     private fun startPersistLoop() {
         persistJob = scope.launch {
             while (isActive) {
                 delay(5_000)
-                if (::player.isInitialized && player.isPlaying) persistProgress()
+                if (::player.isInitialized && player.isPlaying) {
+                    persistProgress()
+                    syncMediaSessionMetadata()
+                }
             }
         }
     }
 
     private fun startLiveNotificationObserver() {
-        val appearance = AppearanceSettings(this)
+        val appearance = container.appearanceSettings
         scope.launch {
             appearance.liveNotifications.collect { enabled ->
                 if (!enabled) {
@@ -332,7 +459,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun startGestureObserver() {
-        val appearance = AppearanceSettings(this)
+        val appearance = container.appearanceSettings
         sensorManager = getSystemService(android.hardware.SensorManager::class.java)
         accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
 
@@ -350,31 +477,33 @@ class PlaybackService : MediaSessionService() {
                     val gZ = z / android.hardware.SensorManager.GRAVITY_EARTH
                     val gForce = kotlin.math.sqrt((gX * gX + gY * gY + gZ * gZ).toDouble()).toFloat()
 
-                    if (gForce > 2.6f) {
+                    if (isShakeGesture(gForce)) {
                         val now = System.currentTimeMillis()
-                        if (now - lastShakeTimestamp > 1400L) {
+                        if (now - lastShakeTimestamp > SHAKE_DEBOUNCE_MS) {
                             lastShakeTimestamp = now
                             if (player.mediaItemCount > 0) {
                                 player.seekToNextMediaItem()
-                                runCatching {
-                                    val vibrator = getSystemService(android.os.Vibrator::class.java)
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(45, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator?.vibrate(45)
-                                    }
-                                }
+                                triggerHapticFeedback(45L)
                             }
                         }
                     }
                 }
 
                 // Flip to pause
-                if (appearance.flipToPause.value && z < -8.5f && kotlin.math.abs(x) < 3.5f && kotlin.math.abs(y) < 3.5f) {
-                    if (player.playWhenReady && player.mediaItemCount > 0) {
-                        player.playWhenReady = false
+                if (appearance.flipToPause.value) {
+                    if (isFaceDownOrientation(x, y, z)) {
+                        if (!isFaceDown) {
+                            isFaceDown = true
+                            if (player.playWhenReady && player.mediaItemCount > 0) {
+                                player.playWhenReady = false
+                                triggerHapticFeedback(45L)
+                            }
+                        }
+                    } else if (isFaceDownReset(z)) {
+                        isFaceDown = false
                     }
+                } else {
+                    isFaceDown = false
                 }
             }
 
@@ -385,20 +514,11 @@ class PlaybackService : MediaSessionService() {
             kotlinx.coroutines.flow.combine(
                 appearance.shakeToSkip,
                 appearance.flipToPause
-            ) { shake, flip -> shake || flip }.collect { needed ->
-                if (needed) {
-                    accelerometer?.let { sensor ->
-                        sensorManager?.registerListener(
-                            sensorListener,
-                            sensor,
-                            android.hardware.SensorManager.SENSOR_DELAY_UI
-                        )
-                    }
-                } else {
-                    sensorListener?.let { sensorManager?.unregisterListener(it) }
-                }
+            ) { _, _ -> }.collect {
+                updateGestureState()
             }
         }
+        updateGestureState()
     }
 
     private fun persistProgress() {
@@ -503,13 +623,33 @@ class PlaybackService : MediaSessionService() {
             putString("capsule_subcontent", album)
             putBoolean("oplus.pantanal.support", true)
             putBoolean("com.oplus.pantanal.support", true)
+            putBoolean("com.oplus.pantanal.capsule.support", true)
+            putBoolean("oplus.capsule.support", true)
+            putBoolean("com.oplus.livealert.support", true)
+            putBoolean("oplus.livealert.support", true)
+            putBoolean("com.oplus.fluidcloud.support", true)
+            putBoolean("oplus.fluidcloud.support", true)
             putString("oplus.pantanal.type", "music")
             putInt("com.oplus.pantanal.capsule.status", if (isPlaying) 1 else 0)
+
+            val sessionActivity = session.sessionActivity ?: PendingIntent.getActivity(
+                this@PlaybackService,
+                0,
+                Intent(this@PlaybackService, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            putParcelable("capsule_action", sessionActivity)
+            putParcelable("oplus_capsule_action", sessionActivity)
+            putParcelable("com.oplus.capsule.action", sessionActivity)
+            val capsuleIcon = android.graphics.drawable.Icon.createWithResource(this@PlaybackService, R.drawable.ic_stat_vinyl)
+            putParcelable("capsule_icon", capsuleIcon)
+            putParcelable("oplus_capsule_icon", capsuleIcon)
+            putParcelable("com.oplus.capsule.icon", capsuleIcon)
         }
 
         session.setSessionExtras(sessionExtras)
 
-        // Directly set platform android.media.session.MediaSession metadata and extras for OxygenOS 15 OplusMediaController
+        // Directly set platform android.media.session.MediaSession metadata, playback state, and extras for OxygenOS 15 OplusMediaController
         runCatching {
             findFrameworkMediaSession(session)?.let { fwkSession ->
                 val fwkMetadata = android.media.MediaMetadata.Builder()
@@ -525,39 +665,33 @@ class PlaybackService : MediaSessionService() {
                     .putString("album", album)
                     .build()
                 fwkSession.setMetadata(fwkMetadata)
+
+                val stateInt = if (isPlaying) {
+                    android.media.session.PlaybackState.STATE_PLAYING
+                } else if (player.playbackState == Player.STATE_BUFFERING) {
+                    android.media.session.PlaybackState.STATE_BUFFERING
+                } else if (player.playbackState == Player.STATE_ENDED) {
+                    android.media.session.PlaybackState.STATE_STOPPED
+                } else {
+                    android.media.session.PlaybackState.STATE_PAUSED
+                }
+                val actions = android.media.session.PlaybackState.ACTION_PLAY or
+                    android.media.session.PlaybackState.ACTION_PAUSE or
+                    android.media.session.PlaybackState.ACTION_PLAY_PAUSE or
+                    android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
+                    android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                    android.media.session.PlaybackState.ACTION_SEEK_TO or
+                    android.media.session.PlaybackState.ACTION_STOP
+
+                val fwkPlaybackState = android.media.session.PlaybackState.Builder()
+                    .setState(stateInt, player.currentPosition.coerceAtLeast(0L), player.playbackParameters.speed)
+                    .setActions(actions)
+                    .setExtras(sessionExtras)
+                    .build()
+
+                fwkSession.setPlaybackState(fwkPlaybackState)
                 fwkSession.setExtras(sessionExtras)
             }
         }
-    }
-
-    private fun findFrameworkMediaSession(obj: Any?): android.media.session.MediaSession? {
-        if (obj == null) return null
-        if (obj is android.media.session.MediaSession) return obj
-
-        var currClass: Class<*>? = obj.javaClass
-        while (currClass != null && currClass != Any::class.java) {
-            for (field in currClass.declaredFields) {
-                if (android.media.session.MediaSession::class.java.isAssignableFrom(field.type)) {
-                    field.isAccessible = true
-                    val found = field.get(obj) as? android.media.session.MediaSession
-                    if (found != null) return found
-                }
-            }
-            currClass = currClass.superclass
-        }
-
-        for (nestedName in listOf("impl", "mediaSessionCompat", "mImpl", "mSessionFwk")) {
-            val nestedObj = runCatching {
-                HighSpinLiveNotificationProvider.findDeclaredField(obj.javaClass, nestedName)?.let { field ->
-                    field.isAccessible = true
-                    field.get(obj)
-                }
-            }.getOrNull()
-            if (nestedObj != null) {
-                val found = findFrameworkMediaSession(nestedObj)
-                if (found != null) return found
-            }
-        }
-        return null
     }
 }

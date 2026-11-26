@@ -1,6 +1,7 @@
 package com.lowspin.app.ui.settings
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -231,6 +232,36 @@ class AppearanceSettings(context: Context) {
 
     private val _crossfadeSec = MutableStateFlow(prefs.getInt(KEY_CROSSFADE_SEC, 0))
     val crossfadeSec: StateFlow<Int> = _crossfadeSec.asStateFlow()
+
+    private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            KEY_THEME -> _themeIndex.value = prefs.getInt(KEY_THEME, 0).coerceIn(0, HighSpinThemes.lastIndex)
+            KEY_ACCENT -> _accentIndex.value = prefs.getInt(KEY_ACCENT, 0)
+            KEY_PURE_BLACK -> _pureBlack.value = prefs.getBoolean(KEY_PURE_BLACK, false)
+            KEY_DYNAMIC_PALETTE -> _dynamicPalette.value = prefs.getBoolean(KEY_DYNAMIC_PALETTE, true)
+            KEY_TURNTABLE -> _turntableMode.value = prefs.getBoolean(KEY_TURNTABLE, false)
+            KEY_VISUALIZER -> _visualizerEnabled.value = prefs.getBoolean(KEY_VISUALIZER, true)
+            KEY_VISUALIZER_STYLE -> _visualizerStyle.value = prefs.getInt(KEY_VISUALIZER_STYLE, 0).coerceIn(0, 4)
+            KEY_TEXT_SCALE -> _textScale.value = prefs.getFloat(KEY_TEXT_SCALE, 1f)
+            KEY_COMPACT -> _compact.value = prefs.getBoolean(KEY_COMPACT, false)
+            KEY_ART -> _showArt.value = prefs.getBoolean(KEY_ART, true)
+            KEY_MOTION -> _reduceMotion.value = prefs.getBoolean(KEY_MOTION, false)
+            KEY_CONTRAST -> _highContrast.value = prefs.getBoolean(KEY_CONTRAST, false)
+            KEY_TARGETS -> _largeTargets.value = prefs.getBoolean(KEY_TARGETS, false)
+            KEY_LIVE_NOTIFICATIONS -> _liveNotifications.value = prefs.getBoolean(KEY_LIVE_NOTIFICATIONS, true)
+            KEY_SHAKE_TO_SKIP -> _shakeToSkip.value = prefs.getBoolean(KEY_SHAKE_TO_SKIP, false)
+            KEY_FLIP_TO_PAUSE -> _flipToPause.value = prefs.getBoolean(KEY_FLIP_TO_PAUSE, false)
+            KEY_AMBIENT_GLOW -> _ambientGlow.value = prefs.getBoolean(KEY_AMBIENT_GLOW, true)
+            KEY_LYRICS_FONT_SIZE -> _lyricsFontSize.value = prefs.getFloat(KEY_LYRICS_FONT_SIZE, 16f)
+            KEY_LYRICS_SYNC_OFFSET -> _lyricsSyncOffset.value = prefs.getInt(KEY_LYRICS_SYNC_OFFSET, 0)
+            KEY_KEEP_SCREEN_ON -> _keepScreenOn.value = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
+            KEY_CROSSFADE_SEC -> _crossfadeSec.value = prefs.getInt(KEY_CROSSFADE_SEC, 0)
+        }
+    }
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+    }
 
     fun setTheme(index: Int) {
         val safe = index.coerceIn(0, HighSpinThemes.lastIndex)

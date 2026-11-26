@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
         )
 
         val container = (application as LowspinApplication).container
-        val appearance = AppearanceSettings(applicationContext)
+        val appearance = container.appearanceSettings
 
         setContent {
             val textScale by appearance.textScale.collectAsStateWithLifecycle()

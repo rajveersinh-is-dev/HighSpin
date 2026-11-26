@@ -15,6 +15,7 @@ import com.lowspin.app.media.EqualizerManager
 import com.lowspin.app.media.EqualizerSettings
 import com.lowspin.app.media.PlaybackController
 import com.lowspin.app.media.SleepTimerManager
+import com.lowspin.app.ui.settings.AppearanceSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -58,6 +59,8 @@ class AppContainer(context: Context) {
     val equalizerManager = EqualizerManager(equalizerSettings, appContext)
 
     val sleepTimer = SleepTimerManager(appContext)
+
+    val appearanceSettings = AppearanceSettings(appContext)
 
     val playbackController = PlaybackController(
         context = appContext,

@@ -10,8 +10,26 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 Grab the ready-to-install APK directly from GitHub Releases:
 
-- **[Download HighSpin Release APK (v2.4.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.89 MB - Ultra lightweight, R8 minified & resource-shrunk)
-- **[Download HighSpin Debug APK (v2.4.0)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+- **[Download HighSpin Release APK (v2.4.1)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.89 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.4.1)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+
+---
+
+## ✨ What's New in v2.4.1
+
+### 📱 OnePlus OxygenOS 15 Live Alerts & Fluid Cloud Notification
+- **Complete Pantanal Manifest Meta-Data:** Added standard `oplus.pantanal.support`, `com.oplus.pantanal.support`, `com.oplus.pantanal.capsule.support`, `oplus.capsule.support`, `com.oplus.livealert.support`, `oplus.livealert.support`, `com.oplus.fluidcloud.support`, and `oplus.fluidcloud.support` under `<application>`, enabling native recognition by OxygenOS 15 / ColorOS 15 system capsule daemons.
+- **Framework PlaybackState Synchronization:** Connected platform `android.media.session.PlaybackState` with state, position, speed, transport actions, and `sessionExtras` (`capsule_action`, `capsule_icon`, `lyricInfo`, and capsule states) directly to the framework `MediaSession`. OxygenOS 15 `OplusMediaController` now reads real-time status and capsule payload accurately.
+- **Refreshed Live Media Notification Channel (`v9`):** Upgraded channel ID to `v9` (`com.lowspin.app.playback.live.v9`), automatically deleting legacy channels to guarantee fresh importance and heads-up presentation.
+- **Android 15 Colorization & Promoted Ongoing Characteristics:** Set `android.colorized = true` and applied dynamic theme accent color to `notification.color`, satisfying Android 15's `Notification.hasPromotableCharacteristics()` requirement for live updates.
+- **Companion Bubble Capsule Mirroring:** Mirrored full Pantanal and capsule extras directly onto companion conversation bubble notifications (`BUBBLE_NOTIFICATION_ID = 1002`).
+- **Periodic Elapsed Time Resync:** Synced framework metadata and playback state every 5 seconds during active playback to prevent elapsed time drift in the OxygenOS status bar pill.
+
+### 🎯 Sensor Gestures Calibrated for OnePlus (Shake-to-Skip & Flip-to-Pause)
+- **Unified Reactive Preference Sync:** Stored a strong-referenced `SharedPreferences.OnSharedPreferenceChangeListener` in `AppearanceSettings` and wired single-instance injection via `AppContainer`, keeping `shakeToSkip`, `flipToPause`, and `liveNotifications` reactive in real time across the service and UI.
+- **Calibrated Shake-to-Skip:** Lowered the shake threshold from unreachable `2.6g` (~25.5 m/s²) to `1.65g` (~16.2 m/s²) above the 1.0g stationary baseline with 1200ms debounce and responsive haptic vibration feedback.
+- **Camera-Bump Calibrated Flip-to-Pause:** Tuned face-down detection for modern phones with large camera bumps (such as OnePlus devices) to `z < -6.5f && sqrt(x*x + y*y) < 6.5f` with hysteresis state tracking (`isFaceDown`) and reset at `z > -2.0f`, pausing playback with haptic vibration upon flipping face-down without false re-triggers.
+- **Background Gesture Wake Lock & 50Hz Sampling:** Upgraded sensor registration to `SensorManager.SENSOR_DELAY_GAME` (50 Hz) and acquired a partial wake lock (`"highspin:sensor_gestures"`) while playing with gestures enabled so motion events are never suspended when the screen is turned off.
 
 ---
 

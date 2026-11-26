@@ -127,7 +127,7 @@ class BubbleActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val container = (application as LowspinApplication).container
-        val appearance = AppearanceSettings(applicationContext)
+        val appearance = container.appearanceSettings
 
         registerPipReceiver()
         updatePipParams(container.playbackController.state.value.isPlaying)

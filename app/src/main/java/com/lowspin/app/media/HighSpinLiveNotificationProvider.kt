@@ -10,6 +10,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import androidx.annotation.OptIn
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -22,9 +23,11 @@ import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import com.google.common.collect.ImmutableList
 import com.lowspin.app.BubbleActivity
+import com.lowspin.app.LowspinApplication
 import com.lowspin.app.MainActivity
 import com.lowspin.app.R
 import com.lowspin.app.ui.settings.AppearanceSettings
+import com.lowspin.app.ui.settings.HighSpinThemes
 import java.io.File
 
 /**
@@ -59,10 +62,11 @@ class HighSpinLiveNotificationProvider(
     companion object {
         const val NOTIFICATION_ID = 1001
         const val BUBBLE_NOTIFICATION_ID = 1002
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v8"
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v9"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
         val CONVERSATION_CHANNEL_ID = "${NOTIFICATION_CHANNEL_ID}_$PLAYBACK_SHORTCUT_ID"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v8",
             "com.lowspin.app.playback.live.v7",
             "com.lowspin.app.playback.live.v6",
             "com.lowspin.app.playback.live.v5",
@@ -86,6 +90,7 @@ class HighSpinLiveNotificationProvider(
         const val EXTRA_SUBST_NAME = "android.substName"
         const val EXTRA_ONGOING = "android.ongoing"
         const val EXTRA_SHOW_CHRONOMETER = "android.showChronometer"
+        const val EXTRA_ANDROID_COLORIZED = "android.colorized"
 
         // OnePlus OxygenOS 15 / ColorOS 15 Fluid Cloud & Live Alert capsule extras
         const val EXTRA_OPLUS_ONGOING = "oplus.ongoing"
@@ -101,6 +106,12 @@ class HighSpinLiveNotificationProvider(
         const val EXTRA_OPLUS_CAPSULE_ICON = "oplus_capsule_icon"
         const val EXTRA_OPLUS_PANTANAL_SUPPORT = "oplus.pantanal.support"
         const val EXTRA_COM_OPLUS_PANTANAL_SUPPORT = "com.oplus.pantanal.support"
+        const val EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT = "com.oplus.pantanal.capsule.support"
+        const val EXTRA_OPLUS_CAPSULE_SUPPORT = "oplus.capsule.support"
+        const val EXTRA_COM_OPLUS_LIVEALERT_SUPPORT = "com.oplus.livealert.support"
+        const val EXTRA_OPLUS_LIVEALERT_SUPPORT = "oplus.livealert.support"
+        const val EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT = "com.oplus.fluidcloud.support"
+        const val EXTRA_OPLUS_FLUIDCLOUD_SUPPORT = "oplus.fluidcloud.support"
         const val EXTRA_OPLUS_PANTANAL_TYPE = "oplus.pantanal.type"
         const val EXTRA_LIVE_NOTIFICATION = "is_live_notification"
         const val EXTRA_ANDROID_LIVE_NOTIFICATION = "android.liveNotification"
@@ -255,7 +266,8 @@ class HighSpinLiveNotificationProvider(
             platformBubble: Any?,
             sessionActivity: PendingIntent?,
             shouldPost: Boolean,
-            isPlaybackActive: Boolean = true
+            isPlaybackActive: Boolean = true,
+            capsuleExtras: Bundle? = null
         ) {
             val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
             if (!shouldPost || bubbleMetadata == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -304,6 +316,12 @@ class HighSpinLiveNotificationProvider(
                     pendingFlags
                 )
 
+                val themeColor = runCatching {
+                    val appearance = (context.applicationContext as? LowspinApplication)?.container?.appearanceSettings
+                        ?: AppearanceSettings(context)
+                    HighSpinThemes.getOrNull(appearance.themeIndex.value)?.primary?.toArgb()
+                }.getOrNull() ?: 0xFFA78BFA.toInt()
+
                 val builder = NotificationCompat.Builder(context, targetChannel)
                     .setSmallIcon(R.drawable.ic_stat_vinyl)
                     .setContentTitle(title)
@@ -316,6 +334,8 @@ class HighSpinLiveNotificationProvider(
                     .setOngoing(true)
                     .setShowWhen(true)
                     .setOnlyAlertOnce(true)
+                    .setColor(themeColor)
+                    .setColorized(true)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .addAction(R.drawable.ic_stat_vinyl, "Prev", prevIntent)
@@ -332,6 +352,39 @@ class HighSpinLiveNotificationProvider(
                 val bubbleNotif = builder.build()
                 applyPromotedOngoingViaReflection(bubbleNotif, true)
                 bubbleNotif.flags = bubbleNotif.flags or Notification.FLAG_ONGOING_EVENT
+                bubbleNotif.color = themeColor
+
+                if (capsuleExtras != null) {
+                    bubbleNotif.extras.putAll(capsuleExtras)
+                } else {
+                    bubbleNotif.extras.apply {
+                        putBoolean(EXTRA_OPLUS_ONGOING, isPlaybackActive)
+                        putBoolean(EXTRA_OPLUS_CAPSULE, isPlaybackActive)
+                        putBoolean(EXTRA_OPLUS_COM_CAPSULE, isPlaybackActive)
+                        putString(EXTRA_OPLUS_CAPSULE_TYPE, "music")
+                        putString("oplus_capsule_type", "music")
+                        putString("com.oplus.capsule.type", "music")
+                        putInt(EXTRA_OPLUS_CAPSULE_STATUS, if (isPlaybackActive) 1 else 0)
+                        putInt("oplus_capsule_state", if (isPlaybackActive) 1 else 0)
+                        putInt("com.oplus.capsule.status", if (isPlaybackActive) 1 else 0)
+                        putString(EXTRA_CAPSULE_TITLE, title)
+                        putString(EXTRA_CAPSULE_CONTENT, artist)
+                        putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, true)
+                        putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, true)
+                        putBoolean(EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT, true)
+                        putBoolean(EXTRA_OPLUS_CAPSULE_SUPPORT, true)
+                        putBoolean(EXTRA_COM_OPLUS_LIVEALERT_SUPPORT, true)
+                        putBoolean(EXTRA_OPLUS_LIVEALERT_SUPPORT, true)
+                        putBoolean(EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT, true)
+                        putBoolean(EXTRA_OPLUS_FLUIDCLOUD_SUPPORT, true)
+                        putString(EXTRA_OPLUS_PANTANAL_TYPE, "music")
+                        putInt("com.oplus.pantanal.capsule.status", if (isPlaybackActive) 1 else 0)
+                        putBoolean(EXTRA_LIVE_NOTIFICATION, isPlaybackActive)
+                        putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, isPlaybackActive)
+                        putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, isPlaybackActive)
+                    }
+                }
+                bubbleNotif.extras.putBoolean(EXTRA_ANDROID_COLORIZED, true)
 
                 nm.notify(BUBBLE_NOTIFICATION_ID, bubbleNotif)
             }
@@ -414,7 +467,10 @@ class HighSpinLiveNotificationProvider(
         }
     }
 
-    private val appearance by lazy { AppearanceSettings(context) }
+    private val appearance by lazy {
+        (context.applicationContext as? LowspinApplication)?.container?.appearanceSettings
+            ?: AppearanceSettings(context)
+    }
 
     private val defaultProvider = DefaultMediaNotificationProvider(
         context,
@@ -495,6 +551,8 @@ class HighSpinLiveNotificationProvider(
         // NotificationCompat.Builder (which strips MediaStyle and causes Android 15 MediaDataManager
         // and OxygenOS 15 Live Alerts to drop the media capsule).
         val notification = rawNotification
+        val themeColor = HighSpinThemes.getOrNull(appearance.themeIndex.value)?.primary?.toArgb() ?: 0xFFA78BFA.toInt()
+        notification.color = themeColor
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
         val flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
@@ -547,6 +605,7 @@ class HighSpinLiveNotificationProvider(
 
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
+            putBoolean(EXTRA_ANDROID_COLORIZED, true)
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")
@@ -591,6 +650,12 @@ class HighSpinLiveNotificationProvider(
                 // Fluid Cloud / Pantanal service compatibility
                 putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, true)
                 putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, true)
+                putBoolean(EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT, true)
+                putBoolean(EXTRA_OPLUS_CAPSULE_SUPPORT, true)
+                putBoolean(EXTRA_COM_OPLUS_LIVEALERT_SUPPORT, true)
+                putBoolean(EXTRA_OPLUS_LIVEALERT_SUPPORT, true)
+                putBoolean(EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT, true)
+                putBoolean(EXTRA_OPLUS_FLUIDCLOUD_SUPPORT, true)
                 putString(EXTRA_OPLUS_PANTANAL_TYPE, "music")
                 putString("com.oplus.pantanal.capsule.type", "music")
                 putInt("com.oplus.pantanal.capsule.status", if (shouldBeOngoing) 1 else 0)
@@ -616,6 +681,12 @@ class HighSpinLiveNotificationProvider(
                 putBoolean(EXTRA_ANDROID_LIVE_NOTIFICATION, false)
                 putBoolean(EXTRA_OPLUS_PANTANAL_SUPPORT, false)
                 putBoolean(EXTRA_COM_OPLUS_PANTANAL_SUPPORT, false)
+                putBoolean(EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT, false)
+                putBoolean(EXTRA_OPLUS_CAPSULE_SUPPORT, false)
+                putBoolean(EXTRA_COM_OPLUS_LIVEALERT_SUPPORT, false)
+                putBoolean(EXTRA_OPLUS_LIVEALERT_SUPPORT, false)
+                putBoolean(EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT, false)
+                putBoolean(EXTRA_OPLUS_FLUIDCLOUD_SUPPORT, false)
             }
 
             // Real-time track progress
@@ -637,7 +708,8 @@ class HighSpinLiveNotificationProvider(
             platformBubble = platformBubble,
             sessionActivity = mediaSession.sessionActivity,
             shouldPost = shouldBeOngoing && isLiveEnabled,
-            isPlaybackActive = isPlaybackActive
+            isPlaybackActive = isPlaybackActive,
+            capsuleExtras = notification.extras
         )
 
         return MediaNotification(mediaNotification.notificationId, notification)

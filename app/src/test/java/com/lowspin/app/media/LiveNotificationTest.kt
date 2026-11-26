@@ -14,7 +14,7 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v8",
+            "com.lowspin.app.playback.live.v9",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
@@ -22,8 +22,11 @@ class LiveNotificationTest {
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
         )
         assertEquals(
-            "com.lowspin.app.playback.live.v8_com.lowspin.app.playback_bubble",
+            "com.lowspin.app.playback.live.v9_com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v8")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v7")
@@ -126,6 +129,34 @@ class LiveNotificationTest {
         assertEquals(
             "oplus.pantanal.type",
             HighSpinLiveNotificationProvider.EXTRA_OPLUS_PANTANAL_TYPE
+        )
+        assertEquals(
+            "com.oplus.pantanal.capsule.support",
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT
+        )
+        assertEquals(
+            "oplus.capsule.support",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_SUPPORT
+        )
+        assertEquals(
+            "com.oplus.livealert.support",
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_LIVEALERT_SUPPORT
+        )
+        assertEquals(
+            "oplus.livealert.support",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_LIVEALERT_SUPPORT
+        )
+        assertEquals(
+            "com.oplus.fluidcloud.support",
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT
+        )
+        assertEquals(
+            "oplus.fluidcloud.support",
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_FLUIDCLOUD_SUPPORT
+        )
+        assertEquals(
+            "android.colorized",
+            HighSpinLiveNotificationProvider.EXTRA_ANDROID_COLORIZED
         )
         assertEquals(
             "is_live_notification",
@@ -486,5 +517,108 @@ class LiveNotificationTest {
         assertEquals("com.lowspin.app.action.PLAY_PAUSE", HighSpinLiveNotificationProvider.ACTION_PLAY_PAUSE)
         assertEquals("com.lowspin.app.action.NEXT", HighSpinLiveNotificationProvider.ACTION_NEXT)
         assertEquals("com.lowspin.app.action.PREV", HighSpinLiveNotificationProvider.ACTION_PREV)
+    }
+
+    @Test
+    fun playbackService_gestureThresholdsAndConstants_calibratedCorrectly() {
+        // Stationary baseline is 1.0g. Shake threshold lowered to 1.65g with 1200ms debounce
+        assertEquals(1.65f, PlaybackService.SHAKE_G_FORCE_THRESHOLD, 0.001f)
+        assertEquals(1200L, PlaybackService.SHAKE_DEBOUNCE_MS)
+
+        // OnePlus camera bump calibrated flip-to-pause parameters
+        assertEquals(-6.5f, PlaybackService.FLIP_Z_THRESHOLD, 0.001f)
+        assertEquals(6.5f, PlaybackService.FLIP_PLANAR_MAX, 0.001f)
+        assertEquals(-2.0f, PlaybackService.FLIP_RESET_Z_THRESHOLD, 0.001f)
+    }
+
+    @Test
+    fun playbackService_gestureDetectionLogic_validatesAccurately() {
+        // Stationary or slight movement should NOT trigger shake
+        assertFalse(PlaybackService.isShakeGesture(1.0f))
+        assertFalse(PlaybackService.isShakeGesture(1.5f))
+        assertFalse(PlaybackService.isShakeGesture(1.64f))
+
+        // Normal deliberate shake reaches 1.65g+
+        assertTrue(PlaybackService.isShakeGesture(1.66f))
+        assertTrue(PlaybackService.isShakeGesture(2.0f))
+        assertTrue(PlaybackService.isShakeGesture(3.0f))
+    }
+
+    @Test
+    fun playbackService_faceDownHysteresisAndCameraBumpAngle_validatesAccurately() {
+        // Perfectly flat on desk face down (z ~ -9.8, x=0, y=0)
+        assertTrue(PlaybackService.isFaceDownOrientation(0f, 0f, -9.8f))
+
+        // OnePlus phone with large camera bump resting tilted face down (z ~ -7.2, planar ~ 2.2)
+        assertTrue(PlaybackService.isFaceDownOrientation(1.0f, 2.0f, -7.2f))
+
+        // On OnePlus phone with camera bump, z is between -6.5f and -8.0f
+        assertTrue(PlaybackService.isFaceDownOrientation(0f, 2.5f, -6.6f))
+
+        // Face up on desk (z = +9.8)
+        assertFalse(PlaybackService.isFaceDownOrientation(0f, 0f, 9.8f))
+
+        // Standing upright in hand (y = 9.8, z = 0)
+        assertFalse(PlaybackService.isFaceDownOrientation(0f, 9.8f, 0f))
+
+        // Held at steep slant or sideways (large planar acceleration >= 6.5)
+        assertFalse(PlaybackService.isFaceDownOrientation(5.0f, 5.0f, -7.0f))
+
+        // Hysteresis reset: face-down state is only reset when phone is flipped back up past -2.0f
+        assertTrue(PlaybackService.isFaceDownReset(0f))
+        assertTrue(PlaybackService.isFaceDownReset(-1.5f))
+        assertFalse(PlaybackService.isFaceDownReset(-2.5f))
+        assertFalse(PlaybackService.isFaceDownReset(-7.0f))
+    }
+
+    @Test
+    fun liveNotification_pantanalAndOxygenOsMetadata_configuredProperly() {
+        val pantanalSupport = listOf(
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_PANTANAL_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_PANTANAL_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_PANTANAL_CAPSULE_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_CAPSULE_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_LIVEALERT_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_LIVEALERT_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_COM_OPLUS_FLUIDCLOUD_SUPPORT,
+            HighSpinLiveNotificationProvider.EXTRA_OPLUS_FLUIDCLOUD_SUPPORT
+        )
+        for (key in pantanalSupport) {
+            assertTrue(key.isNotEmpty())
+            assertTrue(key.contains("pantanal") || key.contains("capsule") || key.contains("livealert") || key.contains("fluidcloud"))
+        }
+    }
+
+    @Test
+    fun playbackService_findFrameworkMediaSession_traversalChainResolution() {
+        // Mock the exact 4-tier hierarchy of Media3 to framework MediaSession:
+        // Tier 1: androidx.media3.session.MediaSession (has field 'impl')
+        // Tier 2: androidx.media3.session.MediaSessionImpl (has field 'sessionCompat')
+        // Tier 3: android.support.v4.media.session.MediaSessionCompat (has field 'mImpl')
+        // Tier 4: MediaSessionImplApi21 (has field 'mSessionFwk' of type android.media.session.MediaSession)
+
+        class Tier4(val mSessionFwk: android.media.session.MediaSession?)
+        class Tier3(val mImpl: Tier4)
+        class Tier2(val sessionCompat: Tier3)
+        class Tier1(val impl: Tier2)
+
+        // Pass a mock or null
+        assertNull(PlaybackService.findFrameworkMediaSession(null))
+
+        val emptyHierarchy = Tier1(Tier2(Tier3(Tier4(null))))
+        assertNull(PlaybackService.findFrameworkMediaSession(emptyHierarchy))
+
+        // When mSessionFwk is non-null
+        val context = object : android.content.ContextWrapper(null) {
+            override fun getPackageName(): String = "com.lowspin.app"
+        }
+        val fwkSession = android.media.session.MediaSession(context, "test_tag")
+        org.junit.Assert.assertNotNull(fwkSession)
+        val validHierarchy = Tier1(Tier2(Tier3(Tier4(fwkSession))))
+        val found = PlaybackService.findFrameworkMediaSession(validHierarchy)
+        assertEquals(fwkSession, found)
+
+        // Direct object resolution
+        assertEquals(fwkSession, PlaybackService.findFrameworkMediaSession(fwkSession))
     }
 }

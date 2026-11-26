@@ -39,6 +39,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Lowspin">
 
+        <meta-data android:name="oplus.pantanal.support" android:value="true" />
+        <meta-data android:name="com.oplus.pantanal.support" android:value="true" />
+        <meta-data android:name="com.oplus.pantanal.capsule.support" android:value="true" />
+        <meta-data android:name="oplus.capsule.support" android:value="true" />
+        <meta-data android:name="com.oplus.livealert.support" android:value="true" />
+        <meta-data android:name="oplus.livealert.support" android:value="true" />
+        <meta-data android:name="com.oplus.fluidcloud.support" android:value="true" />
+        <meta-data android:name="oplus.fluidcloud.support" android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|fontScale|uiMode"
