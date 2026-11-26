@@ -3,6 +3,7 @@ package com.lowspin.app.ui.screens.library
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,8 +34,10 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -45,19 +48,26 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.lowspin.app.data.db.AlbumSummary
 import com.lowspin.app.data.db.ArtistSummary
 import com.lowspin.app.data.db.FolderSummary
@@ -146,7 +156,9 @@ fun LibraryScreen(
                 )
                 1 -> PlaylistsTab(
                     playlists = playlists,
+                    songs = songs,
                     likedCount = likedCount,
+                    onSongClick = onSongClick,
                     onPlaylistClick = onPlaylistClick,
                     onLikedClick = onLikedClick,
                     onCreatePlaylist = onCreatePlaylist
@@ -395,22 +407,113 @@ private fun SongsTab(
 
         songs.isEmpty() -> EmptyLibrary(onRefresh)
 
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 20.dp)
-        ) {
-            items(
-                items = songs,
-                key = { it.id },
-                contentType = { "song" }
-            ) { song ->
-                SongRow(
-                    song = song,
-                    isCurrent = song.id == currentSongId,
-                    onClick = { onSongClick(song) },
-                    onMoreClick = { onSongOptions(song) },
-                    onLongClick = { onSongOptions(song) }
-                )
+        else -> {
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            val coroutineScope = rememberCoroutineScope()
+            var activeLetter by remember { mutableStateOf<Char?>(null) }
+
+            // Grouping letter map: Letter -> first index in songs list
+            val letterIndices = remember(songs) {
+                val map = mutableMapOf<Char, Int>()
+                songs.forEachIndexed { index, song ->
+                    val firstChar = song.title.firstOrNull()?.uppercaseChar() ?: '#'
+                    val letter = if (firstChar in 'A'..'Z') firstChar else '#'
+                    if (!map.containsKey(letter)) {
+                        map[letter] = index
+                    }
+                }
+                map
+            }
+
+            val alphabet = remember(letterIndices) {
+                val letters = ('A'..'Z').filter { letterIndices.containsKey(it) }
+                if (letterIndices.containsKey('#')) listOf('#') + letters else letters
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 20.dp)
+                ) {
+                    items(
+                        items = songs,
+                        key = { it.id },
+                        contentType = { "song" }
+                    ) { song ->
+                        SongRow(
+                            song = song,
+                            isCurrent = song.id == currentSongId,
+                            onClick = { onSongClick(song) },
+                            onMoreClick = { onSongOptions(song) },
+                            onLongClick = { onSongOptions(song) }
+                        )
+                    }
+                }
+
+                // Interactive A-Z Fast Scrollbar
+                if (songs.size >= 12 && alphabet.size > 2) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.50f))
+                            .padding(vertical = 4.dp, horizontal = 2.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            alphabet.forEach { char ->
+                                val targetIndex = letterIndices[char]
+                                Text(
+                                    text = char.toString(),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = if (activeLetter == char) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    modifier = Modifier
+                                        .clickable {
+                                            if (targetIndex != null) {
+                                                activeLetter = char
+                                                coroutineScope.launch {
+                                                    listState.scrollToItem(targetIndex)
+                                                }
+                                            }
+                                        }
+                                        .padding(vertical = 1.dp, horizontal = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Floating active letter indicator bubble
+                    activeLetter?.let { char ->
+                        LaunchedEffect(char) {
+                            kotlinx.coroutines.delay(1200)
+                            activeLetter = null
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .shadow(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = char.toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = LowspinOnAccent,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -419,7 +522,9 @@ private fun SongsTab(
 @Composable
 private fun PlaylistsTab(
     playlists: List<PlaylistSummary>,
+    songs: List<SongEntity>,
     likedCount: Int,
+    onSongClick: (SongEntity) -> Unit,
     onPlaylistClick: (Long) -> Unit,
     onLikedClick: () -> Unit,
     onCreatePlaylist: () -> Unit
@@ -432,6 +537,37 @@ private fun PlaylistsTab(
             LikedSongsCard(
                 songCount = likedCount,
                 onClick = onLikedClick,
+                modifier = Modifier.animateItem()
+            )
+        }
+        item(key = "recent", contentType = "recent") {
+            val recentCount = remember(songs) {
+                val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 3600 * 1000)
+                songs.count { it.dateAdded * 1000L > thirtyDaysAgo }
+            }
+            SmartPlaylistCard(
+                title = "Recently Added",
+                subtitle = if (recentCount == 1) "1 song added recently" else "$recentCount songs added recently",
+                icon = Icons.Rounded.Schedule,
+                gradientColors = listOf(Color(0xFF00C6FF), Color(0xFF0072FF)),
+                onClick = {
+                    val recentSong = songs.maxByOrNull { it.dateAdded }
+                    if (recentSong != null) onSongClick(recentSong)
+                },
+                modifier = Modifier.animateItem()
+            )
+        }
+        item(key = "most_played", contentType = "most_played") {
+            val mostPlayedCount = remember(songs) { songs.count { it.playCount > 0 } }
+            SmartPlaylistCard(
+                title = "Most Played",
+                subtitle = if (mostPlayedCount == 1) "1 song in rotation" else "$mostPlayedCount songs in rotation",
+                icon = Icons.Rounded.Star,
+                gradientColors = listOf(Color(0xFFFF512F), Color(0xFFDD2476)),
+                onClick = {
+                    val topSong = songs.maxByOrNull { it.playCount }
+                    if (topSong != null) onSongClick(topSong)
+                },
                 modifier = Modifier.animateItem()
             )
         }
@@ -466,6 +602,54 @@ private fun PlaylistsTab(
             NewPlaylistCard(
                 onClick = onCreatePlaylist,
                 modifier = Modifier.animateItem()
+            )
+        }
+    }
+}
+
+@Composable
+private fun SmartPlaylistCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    gradientColors: List<Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .pressScaleClickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Brush.linearGradient(gradientColors)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = LowspinTextPrimary,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = LowspinTextPrimary
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

@@ -63,6 +63,7 @@ fun EqualizerScreen(
     val activePreset by equalizerSettings.preset.collectAsStateWithLifecycle()
     val bassBoost by equalizerSettings.bassBoost.collectAsStateWithLifecycle()
     val virtualizer by equalizerSettings.virtualizer.collectAsStateWithLifecycle()
+    val loudnessGain by equalizerSettings.loudnessGain.collectAsStateWithLifecycle()
     val customBandLevels by equalizerSettings.customBandLevels.collectAsStateWithLifecycle()
 
     var bands by remember { mutableStateOf(equalizerManager.getBands()) }
@@ -255,6 +256,40 @@ fun EqualizerScreen(
                         onValueChange = {
                             equalizerSettings.setVirtualizer(it.toInt())
                             equalizerManager.applyVirtualizer(enabled, it.toInt())
+                        },
+                        valueRange = 0f..1000f,
+                        enabled = enabled,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Loudness & Dynamics Booster (DSP)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Loudness & Dynamics Booster (DSP)",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (enabled) LowspinTextPrimary else LowspinTextMuted
+                        )
+                        Text(
+                            text = if (loudnessGain > 0) "+${String.format(java.util.Locale.US, "%.1f", loudnessGain / 100f)} dB" else "Off",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = loudnessGain.toFloat(),
+                        onValueChange = {
+                            equalizerSettings.setLoudnessGain(it.toInt())
+                            equalizerManager.applyLoudness(enabled, it.toInt())
                         },
                         valueRange = 0f..1000f,
                         enabled = enabled,

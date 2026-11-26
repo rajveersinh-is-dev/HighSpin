@@ -92,6 +92,11 @@ fun SettingsScreen(
     val highContrast by appearance.highContrast.collectAsStateWithLifecycle()
     val largeTargets by appearance.largeTargets.collectAsStateWithLifecycle()
     val liveNotifications by appearance.liveNotifications.collectAsStateWithLifecycle()
+    val shakeToSkip by appearance.shakeToSkip.collectAsStateWithLifecycle()
+    val flipToPause by appearance.flipToPause.collectAsStateWithLifecycle()
+    val ambientGlow by appearance.ambientGlow.collectAsStateWithLifecycle()
+    val keepScreenOn by appearance.keepScreenOn.collectAsStateWithLifecycle()
+    val crossfadeSec by appearance.crossfadeSec.collectAsStateWithLifecycle()
 
     var cacheBytes by remember { mutableLongStateOf(container.albumArtRepository.diskCacheSizeBytes()) }
     var isRescanning by remember { mutableStateOf(false) }
@@ -208,6 +213,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(12.dp))
                 ToggleRow("Pure Black (AMOLED OLED)", pureBlack, appearance::setPureBlack)
+                ToggleRow("Ambient Artwork Glow", ambientGlow, appearance::setAmbientGlow)
                 ToggleRow("Audio Visualizer", visualizerEnabled, appearance::setVisualizerEnabled)
                 if (visualizerEnabled) {
                     ChoiceRow(
@@ -233,6 +239,27 @@ fun SettingsScreen(
                 )
                 ToggleRow("Compact lists", compact, appearance::setCompact)
                 ToggleRow("Show album art", showArt, appearance::setShowArt)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Playback & Gestures",
+                style = MaterialTheme.typography.titleMedium,
+                color = LowspinTextPrimary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            SettingCard {
+                ToggleRow("Shake to Skip Track", shakeToSkip, appearance::setShakeToSkip)
+                ToggleRow("Flip Face-Down to Pause", flipToPause, appearance::setFlipToPause)
+                ToggleRow("Keep Screen On in Now Playing", keepScreenOn, appearance::setKeepScreenOn)
+                Spacer(Modifier.height(8.dp))
+                ChoiceRow(
+                    title = "Crossfade transition duration",
+                    options = listOf("Off" to 0f, "2s" to 2f, "4s" to 4f, "6s" to 6f, "8s" to 8f),
+                    selected = crossfadeSec.toFloat(),
+                    onSelect = { appearance.setCrossfadeSec(it.toInt()) }
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -429,6 +456,17 @@ fun SettingsScreen(
             )
 
             Spacer(Modifier.height(12.dp))
+
+            ActionButton("Launch Floating Mini Player / Bubble Now") {
+                runCatching {
+                    val intent = Intent(context, com.lowspin.app.BubbleActivity::class.java).apply {
+                        action = Intent.ACTION_VIEW
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+                    }
+                    context.startActivity(intent)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
 
             if (!notificationsEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 ActionButton("Grant notification permission") {

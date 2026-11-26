@@ -66,6 +66,29 @@ class PlaylistRepository(
         rowId != -1L
     }
 
+    /** Batch adds songs to a playlist, preserving order and skipping duplicates. */
+    suspend fun addSongs(playlistId: Long, songIds: List<Long>): Int = database.withTransaction {
+        var added = 0
+        val now = System.currentTimeMillis()
+        var position = dao.nextPosition(playlistId)
+        for (songId in songIds) {
+            val rowId = dao.addSong(
+                PlaylistSongCrossRef(
+                    playlistId = playlistId,
+                    songId = songId,
+                    position = position,
+                    addedAt = now
+                )
+            )
+            if (rowId != -1L) {
+                position++
+                added++
+            }
+        }
+        if (added > 0) dao.touch(playlistId, now)
+        added
+    }
+
     suspend fun removeSong(playlistId: Long, songId: Long) = database.withTransaction {
         dao.removeSong(playlistId, songId)
         normalizePositions(playlistId)

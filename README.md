@@ -10,8 +10,33 @@ No accounts, zero network permissions, zero tracking, and zero ads. HighSpin tur
 
 Grab the ready-to-install APK directly from GitHub Releases:
 
-- **[Download HighSpin Release APK (v2.3.8)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.88 MB - Ultra lightweight, R8 minified & resource-shrunk)
-- **[Download HighSpin Debug APK (v2.3.8)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+- **[Download HighSpin Release APK (v2.3.9)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~2.89 MB - Ultra lightweight, R8 minified & resource-shrunk)
+- **[Download HighSpin Debug APK (v2.3.9)](https://github.com/rajveersinh-is-dev/HighSpin/releases/latest)** (~20 MB - Full debug runtime & symbols)
+
+---
+
+## ✨ What's New in v2.3.9
+
+### 🔔 Android 15 & OnePlus OxygenOS 15 Live Alerts & Floating Bubble Fix
+- **Dual-Channel Architecture:** Overcomes Android 15's strict system separation between `MediaStyle` (required by `MediaDataManager` and OxygenOS 15 Fluid Cloud) and `MessagingStyle` (required by Android 11–15 `BubbleExtractor`).
+  - **MediaStyle Channel (ID 1001):** Retains 100% compliant media session decoration, capsule metadata (`oplus_capsule`), and `lyricInfo` payload for the status bar live pill, shelf, and lock screen focus alerts on OnePlus OxygenOS 15.
+  - **Companion Bubble Notification (ID 1002):** Automatically posts a conversation-shortcut-backed `MessagingStyle` bubble notification to `CONVERSATION_CHANNEL_ID` during playback, allowing Android 15 users to expand HighSpin into a native floating bubble overlay anywhere on the screen!
+- **Registered Floating Mini Player Bubble:** Enhanced `BubbleActivity` with exported intent filters and direct floating bubble launch action from Settings and Now Playing.
+
+### 🖤 AMOLED Pure Black & Aesthetic Enhancements
+- **True AMOLED Pure Black Mode:** `#000000` pitch black background and surfaces with high-contrast accents, reducing OLED power consumption to absolute zero on dark pixels.
+- **15 Curated Themes:** Added *AMOLED Pitch Black*, *Cherry Blossom Noir*, and *Cyber Platinum Minimal*.
+- **Ambient Artwork Glow:** Soft multi-layer radial aura reflecting current album artwork behind playback controls.
+- **Dynamic Waveform Visual Seekbar:** 40 responsive amplitude bars with glowing active segments and live drag scrubbing.
+- **Audiophile Hi-Res & Codec Badges:** Dynamic golden "HI-RES" and codec pills (FLAC, WAV, AAC, MP3, OPUS) calculated on the fly.
+- **A-Z Fast Alphabet Scrollbar:** Seamless alphabet scrub bar with floating letter preview bubble on Songs tab.
+- **Smart Dynamic Playlists:** Dedicated "Recently Added" and "Most Played" auto-generated collections.
+- **Loudness & Dynamics Booster DSP:** Android `LoudnessEnhancer` audiofx integration for clean hardware gain boost up to +12 dB.
+- **Motion Gestures:** Shake-to-Skip (with haptic feedback) and Flip Face-Down to Pause using low-power hardware accelerometer.
+- **Save Queue as Playlist:** One-tap dialog to save the entire play queue into a new custom playlist.
+- **One-Tap Audio Sharing:** Instant file sharing directly from song options menu and song info sheet.
+- **Lyrics Zoom & Sync Calibration:** A- / A+ zoom controls, copy full lyrics to clipboard, and +/- 0.5s time sync offset chips.
+- **Keep Screen On:** Optional toggle in settings and now-playing screen.
 
 ---
 

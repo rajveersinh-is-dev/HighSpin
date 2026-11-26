@@ -17,6 +17,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- OnePlus OxygenOS 15 & ColorOS 15 Fluid Cloud / Pantanal service permissions -->
+    <uses-permission android:name="com.oplus.permission.safe.ASSISTANT" />
+    <uses-permission android:name="com.oplus.permission.safe.PANTANAL" />
 
     <!-- Hard offline lock: strip network permissions even if a dependency adds them. -->
     <uses-permission
@@ -55,7 +59,12 @@
             android:allowEmbedded="true"
             android:resizeableActivity="true"
             android:documentLaunchMode="always"
-            android:theme="@style/Theme.Lowspin" />
+            android:theme="@style/Theme.Lowspin">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".media.PlaybackService"

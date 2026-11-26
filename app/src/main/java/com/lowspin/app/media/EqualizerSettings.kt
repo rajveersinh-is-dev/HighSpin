@@ -35,6 +35,9 @@ class EqualizerSettings(context: Context) {
     private val _virtualizer = MutableStateFlow(prefs.getInt(KEY_VIRTUALIZER, 0))
     val virtualizer: StateFlow<Int> = _virtualizer.asStateFlow()
 
+    private val _loudnessGain = MutableStateFlow(prefs.getInt(KEY_LOUDNESS, 0))
+    val loudnessGain: StateFlow<Int> = _loudnessGain.asStateFlow()
+
     private val _customBandLevels = MutableStateFlow(loadBandLevels())
     val customBandLevels: StateFlow<Map<Int, Int>> = _customBandLevels.asStateFlow()
 
@@ -65,6 +68,12 @@ class EqualizerSettings(context: Context) {
         val safe = strength.coerceIn(0, 1000)
         _virtualizer.value = safe
         prefs.edit().putInt(KEY_VIRTUALIZER, safe).apply()
+    }
+
+    fun setLoudnessGain(gainMb: Int) {
+        val safe = gainMb.coerceIn(0, 1000)
+        _loudnessGain.value = safe
+        prefs.edit().putInt(KEY_LOUDNESS, safe).apply()
     }
 
     fun setBandLevel(band: Int, levelMb: Int) {
@@ -98,6 +107,7 @@ class EqualizerSettings(context: Context) {
         const val KEY_PRESET = "preset"
         const val KEY_BASS_BOOST = "bass_boost"
         const val KEY_VIRTUALIZER = "virtualizer"
+        const val KEY_LOUDNESS = "loudness_gain"
         const val KEY_BAND_LEVELS = "band_levels"
     }
 }

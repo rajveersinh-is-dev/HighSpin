@@ -121,6 +121,30 @@ val HighSpinThemes = listOf(
         secondary = Color(0xFFA55EEA),
         surface = Color(0xFF1F1424),
         background = Color(0xFF0F0A12)
+    ),
+    ThemePreset(
+        id = "amoled",
+        name = "AMOLED Pitch Black",
+        primary = Color(0xFFA78BFA),
+        secondary = Color(0xFF7C5CD6),
+        surface = Color(0xFF000000),
+        background = Color(0xFF000000)
+    ),
+    ThemePreset(
+        id = "noir",
+        name = "Cherry Blossom Noir",
+        primary = Color(0xFFFF4081),
+        secondary = Color(0xFFEA80FC),
+        surface = Color(0xFF0D0609),
+        background = Color(0xFF000000)
+    ),
+    ThemePreset(
+        id = "platinum",
+        name = "Cyber Platinum Minimal",
+        primary = Color(0xFFE2E8F0),
+        secondary = Color(0xFF94A3B8),
+        surface = Color(0xFF0A0A0C),
+        background = Color(0xFF000000)
     )
 )
 
@@ -187,6 +211,27 @@ class AppearanceSettings(context: Context) {
     private val _liveNotifications = MutableStateFlow(prefs.getBoolean(KEY_LIVE_NOTIFICATIONS, true))
     val liveNotifications: StateFlow<Boolean> = _liveNotifications.asStateFlow()
 
+    private val _shakeToSkip = MutableStateFlow(prefs.getBoolean(KEY_SHAKE_TO_SKIP, false))
+    val shakeToSkip: StateFlow<Boolean> = _shakeToSkip.asStateFlow()
+
+    private val _flipToPause = MutableStateFlow(prefs.getBoolean(KEY_FLIP_TO_PAUSE, false))
+    val flipToPause: StateFlow<Boolean> = _flipToPause.asStateFlow()
+
+    private val _ambientGlow = MutableStateFlow(prefs.getBoolean(KEY_AMBIENT_GLOW, true))
+    val ambientGlow: StateFlow<Boolean> = _ambientGlow.asStateFlow()
+
+    private val _lyricsFontSize = MutableStateFlow(prefs.getFloat(KEY_LYRICS_FONT_SIZE, 16f))
+    val lyricsFontSize: StateFlow<Float> = _lyricsFontSize.asStateFlow()
+
+    private val _lyricsSyncOffset = MutableStateFlow(prefs.getInt(KEY_LYRICS_SYNC_OFFSET, 0))
+    val lyricsSyncOffset: StateFlow<Int> = _lyricsSyncOffset.asStateFlow()
+
+    private val _keepScreenOn = MutableStateFlow(prefs.getBoolean(KEY_KEEP_SCREEN_ON, false))
+    val keepScreenOn: StateFlow<Boolean> = _keepScreenOn.asStateFlow()
+
+    private val _crossfadeSec = MutableStateFlow(prefs.getInt(KEY_CROSSFADE_SEC, 0))
+    val crossfadeSec: StateFlow<Int> = _crossfadeSec.asStateFlow()
+
     fun setTheme(index: Int) {
         val safe = index.coerceIn(0, HighSpinThemes.lastIndex)
         store { putInt(KEY_THEME, safe) }
@@ -235,6 +280,27 @@ class AppearanceSettings(context: Context) {
     fun setLiveNotifications(value: Boolean) = store { putBoolean(KEY_LIVE_NOTIFICATIONS, value) }
         .also { _liveNotifications.value = value }
 
+    fun setShakeToSkip(value: Boolean) = store { putBoolean(KEY_SHAKE_TO_SKIP, value) }
+        .also { _shakeToSkip.value = value }
+
+    fun setFlipToPause(value: Boolean) = store { putBoolean(KEY_FLIP_TO_PAUSE, value) }
+        .also { _flipToPause.value = value }
+
+    fun setAmbientGlow(value: Boolean) = store { putBoolean(KEY_AMBIENT_GLOW, value) }
+        .also { _ambientGlow.value = value }
+
+    fun setLyricsFontSize(size: Float) = store { putFloat(KEY_LYRICS_FONT_SIZE, size.coerceIn(12f, 26f)) }
+        .also { _lyricsFontSize.value = size.coerceIn(12f, 26f) }
+
+    fun setLyricsSyncOffset(offsetMs: Int) = store { putInt(KEY_LYRICS_SYNC_OFFSET, offsetMs.coerceIn(-10000, 10000)) }
+        .also { _lyricsSyncOffset.value = offsetMs.coerceIn(-10000, 10000) }
+
+    fun setKeepScreenOn(value: Boolean) = store { putBoolean(KEY_KEEP_SCREEN_ON, value) }
+        .also { _keepScreenOn.value = value }
+
+    fun setCrossfadeSec(seconds: Int) = store { putInt(KEY_CROSSFADE_SEC, seconds.coerceIn(0, 12)) }
+        .also { _crossfadeSec.value = seconds.coerceIn(0, 12) }
+
     private fun store(edit: android.content.SharedPreferences.Editor.() -> Unit) {
         prefs.edit().apply(edit).apply()
     }
@@ -254,5 +320,12 @@ class AppearanceSettings(context: Context) {
         const val KEY_CONTRAST = "high_contrast"
         const val KEY_TARGETS = "large_targets"
         const val KEY_LIVE_NOTIFICATIONS = "live_notifications"
+        const val KEY_SHAKE_TO_SKIP = "shake_to_skip"
+        const val KEY_FLIP_TO_PAUSE = "flip_to_pause"
+        const val KEY_AMBIENT_GLOW = "ambient_glow"
+        const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
+        const val KEY_LYRICS_SYNC_OFFSET = "lyrics_sync_offset"
+        const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
+        const val KEY_CROSSFADE_SEC = "crossfade_sec"
     }
 }

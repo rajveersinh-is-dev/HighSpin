@@ -3,6 +3,7 @@ package com.lowspin.app.media
 import android.content.Context
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
+import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 
 data class BandInfo(
@@ -24,6 +25,7 @@ class EqualizerManager(
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
     private var virtualizer: Virtualizer? = null
+    private var loudnessEnhancer: LoudnessEnhancer? = null
 
     val available: Boolean get() = equalizer != null
 
@@ -32,6 +34,7 @@ class EqualizerManager(
         equalizer = runCatching { Equalizer(0, audioSessionId) }.getOrNull()
         bassBoost = runCatching { BassBoost(0, audioSessionId) }.getOrNull()
         virtualizer = runCatching { Virtualizer(0, audioSessionId) }.getOrNull()
+        loudnessEnhancer = runCatching { LoudnessEnhancer(audioSessionId) }.getOrNull()
 
         applyAll()
     }
@@ -41,6 +44,7 @@ class EqualizerManager(
         applyEqualizer(enabled, settings.preset.value)
         applyBassBoost(enabled, settings.bassBoost.value)
         applyVirtualizer(enabled, settings.virtualizer.value)
+        applyLoudness(enabled, settings.loudnessGain.value)
     }
 
     fun applyEqualizer(enabled: Boolean, presetIndex: Int) {
@@ -108,6 +112,14 @@ class EqualizerManager(
         }
     }
 
+    fun applyLoudness(enabled: Boolean, gainMb: Int) {
+        val le = loudnessEnhancer ?: return
+        runCatching {
+            le.enabled = enabled && gainMb > 0
+            le.setTargetGain(gainMb.coerceIn(0, 1000))
+        }
+    }
+
     fun getBands(): List<BandInfo> {
         val eq = equalizer
         if (eq == null) {
@@ -169,5 +181,7 @@ class EqualizerManager(
         bassBoost = null
         runCatching { virtualizer?.release() }
         virtualizer = null
+        runCatching { loudnessEnhancer?.release() }
+        loudnessEnhancer = null
     }
 }

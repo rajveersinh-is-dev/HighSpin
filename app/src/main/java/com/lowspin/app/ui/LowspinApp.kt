@@ -714,6 +714,17 @@ fun LowspinApp(container: AppContainer) {
         QueueSheet(
             state = playerState,
             playbackController = container.playbackController,
+            onSaveQueueAsPlaylist = { name, songs ->
+                scope.launch {
+                    val playlistId = container.playlistRepository.createPlaylist(name)
+                    container.playlistRepository.addSongs(playlistId, songs.map { it.id })
+                    android.widget.Toast.makeText(
+                        context,
+                        "Saved ${songs.size} songs to \"$name\"",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
             onDismiss = { showQueueSheet = false }
         )
     }

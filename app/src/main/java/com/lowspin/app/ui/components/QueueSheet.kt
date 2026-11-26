@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragHandle
@@ -58,9 +59,11 @@ import kotlin.math.roundToInt
 fun QueueSheet(
     state: PlayerUiState,
     playbackController: PlaybackController,
+    onSaveQueueAsPlaylist: ((name: String, songs: List<SongEntity>) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSaveDialog by remember { mutableStateOf(false) }
     val queueSongs = remember(state.queueSize, state.currentSong, state.currentMediaItemIndex) {
         playbackController.getQueueSongs()
     }
@@ -113,6 +116,18 @@ fun QueueSheet(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (queueSongs.isNotEmpty() && onSaveQueueAsPlaylist != null) {
+                        IconButton(
+                            onClick = { showSaveDialog = true },
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                                contentDescription = "Save Queue as Playlist",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     if (localUpcoming.isNotEmpty()) {
                         TextButton(
                             onClick = {
@@ -311,5 +326,18 @@ fun QueueSheet(
                 }
             }
         }
+    }
+
+    if (showSaveDialog) {
+        CreatePlaylistDialog(
+            onDismiss = { showSaveDialog = false },
+            onCreate = { name ->
+                showSaveDialog = false
+                val clean = name.trim()
+                if (clean.isNotEmpty()) {
+                    onSaveQueueAsPlaylist?.invoke(clean, queueSongs)
+                }
+            }
+        )
     }
 }

@@ -47,6 +47,10 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val smartShuffle = SmartShuffleManager()
     private var persistJob: Job? = null
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var accelerometer: android.hardware.Sensor? = null
+    private var sensorListener: android.hardware.SensorEventListener? = null
+    private var lastShakeTimestamp = 0L
 
     private val container: com.lowspin.app.di.AppContainer
         get() = (application as LowspinApplication).container
@@ -115,6 +119,7 @@ class PlaybackService : MediaSessionService() {
         startSleepTimer()
         startPersistLoop()
         startLiveNotificationObserver()
+        startGestureObserver()
     }
 
     private fun createNotificationChannel() {
@@ -188,6 +193,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         persistJob?.cancel()
+        sensorListener?.let { sensorManager?.unregisterListener(it) }
+        runCatching {
+            getSystemService(NotificationManager::class.java)
+                ?.cancel(HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
+        }
         runCatching { runBlocking(Dispatchers.IO) { saveProgress() } }
         container.equalizerManager.release()
         mediaSession?.release()
@@ -224,6 +234,14 @@ class PlaybackService : MediaSessionService() {
                 container.equalizerManager.applyVirtualizer(
                     container.equalizerSettings.enabled.value,
                     virt
+                )
+            }
+        }
+        scope.launch {
+            container.equalizerSettings.loudnessGain.collect { gain ->
+                container.equalizerManager.applyLoudness(
+                    container.equalizerSettings.enabled.value,
+                    gain
                 )
             }
         }
@@ -268,11 +286,87 @@ class PlaybackService : MediaSessionService() {
     private fun startLiveNotificationObserver() {
         val appearance = AppearanceSettings(this)
         scope.launch {
-            appearance.liveNotifications.collect {
+            appearance.liveNotifications.collect { enabled ->
+                if (!enabled) {
+                    runCatching {
+                        getSystemService(NotificationManager::class.java)
+                            ?.cancel(HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
+                    }
+                }
                 if (::player.isInitialized && player.mediaItemCount > 0) {
                     runCatching {
                         setMediaNotificationProvider(HighSpinLiveNotificationProvider(this@PlaybackService))
                     }
+                }
+            }
+        }
+    }
+
+    private fun startGestureObserver() {
+        val appearance = AppearanceSettings(this)
+        sensorManager = getSystemService(android.hardware.SensorManager::class.java)
+        accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+
+        sensorListener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+                if (event == null || !::player.isInitialized) return
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+
+                // Shake to skip
+                if (appearance.shakeToSkip.value) {
+                    val gX = x / android.hardware.SensorManager.GRAVITY_EARTH
+                    val gY = y / android.hardware.SensorManager.GRAVITY_EARTH
+                    val gZ = z / android.hardware.SensorManager.GRAVITY_EARTH
+                    val gForce = kotlin.math.sqrt((gX * gX + gY * gY + gZ * gZ).toDouble()).toFloat()
+
+                    if (gForce > 2.6f) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastShakeTimestamp > 1400L) {
+                            lastShakeTimestamp = now
+                            if (player.mediaItemCount > 0) {
+                                player.seekToNextMediaItem()
+                                runCatching {
+                                    val vibrator = getSystemService(android.os.Vibrator::class.java)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(45, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        vibrator?.vibrate(45)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Flip to pause
+                if (appearance.flipToPause.value && z < -8.5f && kotlin.math.abs(x) < 3.5f && kotlin.math.abs(y) < 3.5f) {
+                    if (player.playWhenReady && player.mediaItemCount > 0) {
+                        player.playWhenReady = false
+                    }
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) = Unit
+        }
+
+        scope.launch {
+            kotlinx.coroutines.flow.combine(
+                appearance.shakeToSkip,
+                appearance.flipToPause
+            ) { shake, flip -> shake || flip }.collect { needed ->
+                if (needed) {
+                    accelerometer?.let { sensor ->
+                        sensorManager?.registerListener(
+                            sensorListener,
+                            sensor,
+                            android.hardware.SensorManager.SENSOR_DELAY_UI
+                        )
+                    }
+                } else {
+                    sensorListener?.let { sensorManager?.unregisterListener(it) }
                 }
             }
         }

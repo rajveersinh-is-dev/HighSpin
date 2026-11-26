@@ -25,8 +25,8 @@ fun LowspinTheme(content: @Composable () -> Unit) {
         val secondary = preset.secondary
 
         val bg = if (pureBlack) Color(0xFF000000) else preset.background
-        val surface = if (pureBlack) Color(0xFF0C0C0E) else preset.surface
-        val surfaceHigh = if (pureBlack) Color(0xFF18181C) else Color(
+        val surface = if (pureBlack) Color(0xFF000000) else preset.surface
+        val surfaceHigh = if (pureBlack) Color(0xFF101014) else Color(
             red = (preset.surface.red * 1.35f).coerceAtMost(1f),
             green = (preset.surface.green * 1.35f).coerceAtMost(1f),
             blue = (preset.surface.blue * 1.35f).coerceAtMost(1f)

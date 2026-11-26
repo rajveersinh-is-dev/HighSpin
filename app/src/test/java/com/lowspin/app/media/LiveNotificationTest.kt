@@ -14,7 +14,7 @@ class LiveNotificationTest {
     @Test
     fun liveNotification_constantsMatchRequirements() {
         assertEquals(
-            "com.lowspin.app.playback.live.v7",
+            "com.lowspin.app.playback.live.v8",
             HighSpinLiveNotificationProvider.NOTIFICATION_CHANNEL_ID
         )
         assertEquals(
@@ -22,8 +22,11 @@ class LiveNotificationTest {
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_ID
         )
         assertEquals(
-            "com.lowspin.app.playback.live.v7_com.lowspin.app.playback_bubble",
+            "com.lowspin.app.playback.live.v8_com.lowspin.app.playback_bubble",
             HighSpinLiveNotificationProvider.CONVERSATION_CHANNEL_ID
+        )
+        assertTrue(
+            HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v7")
         )
         assertTrue(
             HighSpinLiveNotificationProvider.PREVIOUS_NOTIFICATION_CHANNEL_IDS.contains("com.lowspin.app.playback.live.v6")
@@ -47,6 +50,7 @@ class LiveNotificationTest {
             HighSpinLiveNotificationProvider.PLAYBACK_SHORTCUT_CATEGORIES.contains("android.shortcut.conversation")
         )
         assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
+        assertEquals(1002, HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
         assertEquals(
             "android.requestPromotedOngoing",
             HighSpinLiveNotificationProvider.EXTRA_REQUEST_PROMOTED_ONGOING
@@ -295,13 +299,16 @@ class LiveNotificationTest {
 
     @Test
     fun liveNotification_themesCountAndVisualizerAesthetics() {
-        // 12 curated aesthetic themes
-        assertEquals(12, HighSpinThemes.size)
+        // 15 curated aesthetic themes including Pure Black, Cherry Noir, and Cyber Platinum
+        assertEquals(15, HighSpinThemes.size)
         assertTrue(HighSpinThemes.any { it.id == "tokyo" })
         assertTrue(HighSpinThemes.any { it.id == "velvet" })
         assertTrue(HighSpinThemes.any { it.id == "aurora" })
         assertTrue(HighSpinThemes.any { it.id == "synthwave" })
         assertTrue(HighSpinThemes.any { it.id == "frost" })
+        assertTrue(HighSpinThemes.any { it.id == "amoled" })
+        assertTrue(HighSpinThemes.any { it.id == "noir" })
+        assertTrue(HighSpinThemes.any { it.id == "platinum" })
     }
 
     @Test
@@ -445,5 +452,24 @@ class LiveNotificationTest {
         }
         val intent = HighSpinLiveNotificationProvider.buildBubbleIntent(context)
         org.junit.Assert.assertNotNull(intent)
+    }
+
+    @Test
+    fun liveNotification_companionBubbleNotificationId_isDistinctFromPlaybackNotification() {
+        // HighSpin dual-channel notification architecture:
+        // ID 1001 for MediaStyle playback notification (OxygenOS 15 Live Alerts / Media Carousel)
+        // ID 1002 for MessagingStyle companion conversation bubble (Android 11-15 Floating Bubbles)
+        assertTrue(HighSpinLiveNotificationProvider.NOTIFICATION_ID != HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
+        assertEquals(1001, HighSpinLiveNotificationProvider.NOTIFICATION_ID)
+        assertEquals(1002, HighSpinLiveNotificationProvider.BUBBLE_NOTIFICATION_ID)
+    }
+
+    @Test
+    fun liveNotification_pureBlackThemePreset_configuredCorrectly() {
+        val pureBlack = HighSpinThemes.find { it.id == "amoled" }
+        org.junit.Assert.assertNotNull(pureBlack)
+        assertEquals("AMOLED Pitch Black", pureBlack!!.name)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF000000), pureBlack.background)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF000000), pureBlack.surface)
     }
 }

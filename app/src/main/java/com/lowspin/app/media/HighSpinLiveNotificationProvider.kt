@@ -58,10 +58,12 @@ class HighSpinLiveNotificationProvider(
 
     companion object {
         const val NOTIFICATION_ID = 1001
-        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v7"
+        const val BUBBLE_NOTIFICATION_ID = 1002
+        const val NOTIFICATION_CHANNEL_ID = "com.lowspin.app.playback.live.v8"
         const val PLAYBACK_SHORTCUT_ID = "com.lowspin.app.playback_bubble"
         val CONVERSATION_CHANNEL_ID = "${NOTIFICATION_CHANNEL_ID}_$PLAYBACK_SHORTCUT_ID"
         val PREVIOUS_NOTIFICATION_CHANNEL_IDS = listOf(
+            "com.lowspin.app.playback.live.v7",
             "com.lowspin.app.playback.live.v6",
             "com.lowspin.app.playback.live.v5",
             "com.lowspin.app.playback.live.v4",
@@ -235,6 +237,80 @@ class HighSpinLiveNotificationProvider(
         }
 
         /**
+         * Posts or clears the Companion Conversation Notification (ID 1002).
+         * On Android 11 to 15, Android's BubbleExtractor requires a notification to use
+         * Notification.MessagingStyle and be linked to an approved conversation channel
+         * in order to be displayed as a floating bubble or show the bubble icon.
+         */
+        fun updateCompanionBubbleNotification(
+            context: Context,
+            title: String,
+            artist: String,
+            artBitmap: Bitmap?,
+            bubbleMetadata: NotificationCompat.BubbleMetadata?,
+            platformBubble: Any?,
+            sessionActivity: PendingIntent?,
+            shouldPost: Boolean
+        ) {
+            val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
+            if (!shouldPost || bubbleMetadata == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                runCatching { nm.cancel(BUBBLE_NOTIFICATION_ID) }
+                return
+            }
+
+            runCatching {
+                val convChannel = nm.getNotificationChannel(CONVERSATION_CHANNEL_ID)
+                val targetChannel = if (convChannel != null) CONVERSATION_CHANNEL_ID else NOTIFICATION_CHANNEL_ID
+
+                val person = Person.Builder()
+                    .setName("HighSpin")
+                    .setKey("highspin_playback")
+                    .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_vinyl))
+                    .setBot(false)
+                    .setImportant(true)
+                    .build()
+
+                val messagingStyle = NotificationCompat.MessagingStyle(person)
+                    .addMessage("$title • $artist", System.currentTimeMillis(), person)
+                    .setConversationTitle("Now Playing")
+
+                val builder = NotificationCompat.Builder(context, targetChannel)
+                    .setSmallIcon(R.drawable.ic_stat_vinyl)
+                    .setContentTitle(title)
+                    .setContentText(artist)
+                    .setStyle(messagingStyle)
+                    .setShortcutId(PLAYBACK_SHORTCUT_ID)
+                    .addPerson(person)
+                    .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    .setBubbleMetadata(bubbleMetadata)
+                    .setOngoing(true)
+                    .setShowWhen(true)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+                if (sessionActivity != null) {
+                    builder.setContentIntent(sessionActivity)
+                }
+                if (artBitmap != null) {
+                    builder.setLargeIcon(artBitmap)
+                }
+
+                val bubbleNotif = builder.build()
+                applyPromotedOngoingViaReflection(bubbleNotif, true)
+                applyNotificationInternalOverrides(
+                    target = bubbleNotif,
+                    channelId = targetChannel,
+                    shortcutId = PLAYBACK_SHORTCUT_ID,
+                    bubbleMetadata = platformBubble,
+                    clearGroup = true
+                )
+                bubbleNotif.flags = bubbleNotif.flags or Notification.FLAG_BUBBLE or Notification.FLAG_ONGOING_EVENT
+
+                nm.notify(BUBBLE_NOTIFICATION_ID, bubbleNotif)
+            }
+        }
+
+        /**
          * Safely invokes Android 15 Promoted Ongoing (Live Updates) platform APIs via reflection.
          */
         fun applyPromotedOngoingViaReflection(target: Any, isPromoted: Boolean) {
@@ -386,110 +462,12 @@ class HighSpinLiveNotificationProvider(
             artBitmap = rawNotification.largeIcon
         }
 
-        // DefaultMediaNotificationProvider hardcodes setOngoing(false) and groups children
-        // with "media3_group_key" right before build(). Android 15 Promoted Ongoing
-        // (Notification.hasPromotableCharacteristics) explicitly checks:
-        //    if (!isOngoing()) return false;
-        //    if (isGroupChild() && !isGroupSummary()) return false;
-        // We use NotificationCompat.Builder(context, rawNotification) to rebuild cleanly without
-        // relying on fragile platform recoverBuilder (which throws ClassNotFoundException on
-        // AndroidX MediaStyle templates). This sets ongoing, clears groupKey, assigns shortcut ID
-        // for bubbles, binds BubbleMetadata, and applies promoted ongoing flags cleanly.
-        val targetChannelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && isLiveEnabled && bubbleMetadata != null) {
-            val nm = context.getSystemService(android.app.NotificationManager::class.java)
-            if (nm?.getNotificationChannel(CONVERSATION_CHANNEL_ID) != null) {
-                CONVERSATION_CHANNEL_ID
-            } else {
-                NOTIFICATION_CHANNEL_ID
-            }
-        } else {
-            NOTIFICATION_CHANNEL_ID
-        }
-
-        val notification = runCatching {
-            val person = Person.Builder()
-                .setName("HighSpin")
-                .setKey("highspin_playback")
-                .setBot(false)
-                .setImportant(true)
-                .build()
-
-            val compatBuilder = NotificationCompat.Builder(context, rawNotification)
-                .setChannelId(targetChannelId)
-                .setOngoing(shouldBeOngoing)
-                .setGroup(null)
-                .setShortcutId(PLAYBACK_SHORTCUT_ID)
-                .addPerson(person)
-                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setShowWhen(shouldBeOngoing)
-
-            if (shouldBeOngoing && position >= 0L) {
-                compatBuilder.setWhen(System.currentTimeMillis() - position)
-            } else {
-                compatBuilder.setWhen(System.currentTimeMillis())
-            }
-
-            if (shouldBeOngoing) {
-                compatBuilder.setTicker(formatTicker(title, artist))
-            } else {
-                compatBuilder.setTicker(null)
-            }
-
-            if (artBitmap != null) {
-                compatBuilder.setLargeIcon(artBitmap)
-            }
-
-            if (isLiveEnabled && bubbleMetadata != null) {
-                compatBuilder.setBubbleMetadata(bubbleMetadata)
-            }
-
-            val built = compatBuilder.build()
-            applyPromotedOngoingViaReflection(built, shouldBeOngoing)
-            built
-        }.getOrElse {
-            rawNotification.flags = computeOngoingFlags(rawNotification.flags, shouldBeOngoing)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && bubbleMetadata != null) {
-                rawNotification.flags = rawNotification.flags or Notification.FLAG_BUBBLE
-            }
-            rawNotification.category = Notification.CATEGORY_TRANSPORT
-            rawNotification.visibility = Notification.VISIBILITY_PUBLIC
-            @Suppress("DEPRECATION")
-            rawNotification.priority = Notification.PRIORITY_HIGH
-            if (shouldBeOngoing) {
-                rawNotification.tickerText = formatTicker(title, artist)
-            } else {
-                rawNotification.tickerText = null
-            }
-            if (shouldBeOngoing && position >= 0L) {
-                rawNotification.`when` = System.currentTimeMillis() - position
-            } else {
-                rawNotification.`when` = System.currentTimeMillis()
-            }
-            if (artBitmap != null) {
-                @Suppress("DEPRECATION")
-                rawNotification.largeIcon = artBitmap
-            }
-            applyPromotedOngoingViaReflection(rawNotification, shouldBeOngoing)
-            rawNotification
-        }
-
-        // Unconditionally remove media3 groupKey and assign shortcut & bubble metadata extras
-        notification.extras.remove("android.support.groupKey")
-        notification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
-            notification.extras.putParcelable("android.support.bubbleMetadata", platformBubble)
-        }
-
-        // Guaranteed override of internal fields to satisfy promotable and bubble constraints
-        applyNotificationInternalOverrides(
-            target = notification,
-            channelId = targetChannelId,
-            shortcutId = PLAYBACK_SHORTCUT_ID,
-            bubbleMetadata = platformBubble,
-            clearGroup = true
-        )
+        // DefaultMediaNotificationProvider creates baseMediaNotification with pure MediaStyle,
+        // media session token (android.mediaSession), and playback transport actions.
+        // We preserve rawNotification directly rather than rebuilding it with a bare
+        // NotificationCompat.Builder (which strips MediaStyle and causes Android 15 MediaDataManager
+        // and OxygenOS 15 Live Alerts to drop the media capsule).
+        val notification = rawNotification
 
         // 1. Android 15 & OxygenOS 15 require FLAG_ONGOING_EVENT for status bar capsule and promoted ongoing.
         var flags = computeOngoingFlags(notification.flags, shouldBeOngoing)
@@ -527,6 +505,22 @@ class HighSpinLiveNotificationProvider(
                 Icon.createWithBitmap(artBitmap)
             )
         }
+
+        // Unconditionally remove media3 groupKey and assign shortcut & bubble metadata extras
+        notification.extras.remove("android.support.groupKey")
+        notification.extras.putString("android.support.shortcutId", PLAYBACK_SHORTCUT_ID)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && platformBubble != null) {
+            notification.extras.putParcelable("android.support.bubbleMetadata", platformBubble)
+        }
+
+        // Guaranteed override of internal fields to satisfy promotable and bubble constraints
+        applyNotificationInternalOverrides(
+            target = notification,
+            channelId = NOTIFICATION_CHANNEL_ID,
+            shortcutId = PLAYBACK_SHORTCUT_ID,
+            bubbleMetadata = platformBubble,
+            clearGroup = true
+        )
 
         // 6. Complete Android 15 Promoted Ongoing (Live Updates) & OnePlus OxygenOS 15 Live Alerts extras
         val lyricJson = metadata.extras?.getString("lyricInfo")
@@ -601,6 +595,18 @@ class HighSpinLiveNotificationProvider(
                 putBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
             }
         }
+
+        // Keep companion MessagingStyle conversation bubble notification synchronized for Android 15 & OxygenOS 15
+        updateCompanionBubbleNotification(
+            context = context,
+            title = title,
+            artist = artist,
+            artBitmap = artBitmap,
+            bubbleMetadata = bubbleMetadata,
+            platformBubble = platformBubble,
+            sessionActivity = mediaSession.sessionActivity,
+            shouldPost = shouldBeOngoing && isLiveEnabled
+        )
 
         return MediaNotification(mediaNotification.notificationId, notification)
     }

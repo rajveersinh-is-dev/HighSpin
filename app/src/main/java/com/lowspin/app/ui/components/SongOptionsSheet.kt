@@ -1,5 +1,8 @@
 package com.lowspin.app.ui.components
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.HideSource
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -46,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lowspin.app.data.db.PlaylistSummary
@@ -69,6 +74,7 @@ fun SongOptionsSheet(
     onRemoveFromLibrary: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -142,6 +148,24 @@ fun SongOptionsSheet(
                     icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
                     label = "Add to playlist",
                     onClick = { showPlaylistPicker = true }
+                )
+                SheetActionRow(
+                    icon = Icons.Rounded.Share,
+                    label = "Share audio file",
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = song.mimeType.ifBlank { "audio/*" }
+                                putExtra(Intent.EXTRA_STREAM, Uri.parse(song.contentUri))
+                                putExtra(Intent.EXTRA_TITLE, "${song.artist} - ${song.title}")
+                                putExtra(Intent.EXTRA_TEXT, "${song.title} - ${song.artist}")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Share audio file"))
+                        } catch (e: Throwable) {
+                            Toast.makeText(context, "Cannot share file: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 )
                 if (onShowInfo != null) {
                     SheetActionRow(
