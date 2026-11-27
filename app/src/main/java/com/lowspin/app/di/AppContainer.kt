@@ -70,6 +70,7 @@ class AppContainer(context: Context) {
         context = appContext,
         scope = applicationScope,
         database = database,
-        artRepository = albumArtRepository
+        artRepository = albumArtRepository,
+        appearanceSettings = appearanceSettings
     )
 }

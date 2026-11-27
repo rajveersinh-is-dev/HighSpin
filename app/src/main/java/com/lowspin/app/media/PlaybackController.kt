@@ -14,6 +14,7 @@ import com.lowspin.app.data.db.PlayEventEntity
 import com.lowspin.app.data.db.PlaybackStateEntity
 import com.lowspin.app.data.db.QueueItemEntity
 import com.lowspin.app.data.db.SongEntity
+import com.lowspin.app.ui.settings.AppearanceSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,7 +52,8 @@ class PlaybackController(
     private val context: Context,
     private val scope: CoroutineScope,
     private val database: LowspinDatabase,
-    private val artRepository: AlbumArtRepository
+    private val artRepository: AlbumArtRepository,
+    private val appearanceSettings: AppearanceSettings? = null
 ) {
 
     private var controller: MediaController? = null
@@ -242,6 +244,12 @@ class PlaybackController(
 
     private fun onTrackStarted(mediaItem: MediaItem?) {
         val id = mediaItem?.mediaId?.toLongOrNull() ?: return
+        appearanceSettings?.let { app ->
+            val rememberedSpeed = app.getSongSpeed(id)
+            if (rememberedSpeed != _state.value.playbackSpeed) {
+                setSpeed(rememberedSpeed)
+            }
+        }
         if (id == lastRecordedSongId) return
         lastRecordedSongId = id
 
@@ -402,7 +410,17 @@ class PlaybackController(
         val safeSpeed = speed.coerceIn(0.5f, 2.5f)
         mediaController.playbackParameters = androidx.media3.common.PlaybackParameters(safeSpeed, currentPitch)
         _state.update { it.copy(playbackSpeed = safeSpeed) }
+        _state.value.currentSong?.id?.let { songId ->
+            appearanceSettings?.setSongSpeed(songId, safeSpeed)
+        }
         persistModes()
+    }
+
+    fun setPitchSemitones(semitones: Int) {
+        val safe = semitones.coerceIn(-6, 6)
+        appearanceSettings?.setPitchSemitones(safe)
+        val pitchMultiplier = Math.pow(2.0, safe / 12.0).toFloat().coerceIn(0.5f, 2.0f)
+        setPitch(pitchMultiplier)
     }
 
     fun setPlaybackSpeed(speed: Float) = setSpeed(speed)

@@ -28,6 +28,32 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    fun migration8to9_versionNumbersCorrect_andNewEntities() {
+        assertEquals(8, LowspinDatabase.MIGRATION_8_9.startVersion)
+        assertEquals(9, LowspinDatabase.MIGRATION_8_9.endVersion)
+
+        val smartPlaylist = SmartPlaylistEntity(
+            id = 1L,
+            name = "Workout High BPM",
+            rules = "{\"minBpm\":130}",
+            createdAt = 1700000000L
+        )
+        assertEquals(1L, smartPlaylist.id)
+        assertEquals("Workout High BPM", smartPlaylist.name)
+        assertEquals("{\"minBpm\":130}", smartPlaylist.rules)
+
+        val bookmark = BookmarkEntity(
+            id = 5L,
+            songId = 42L,
+            positionMs = 65_000L,
+            label = "Guitar Solo"
+        )
+        assertEquals(42L, bookmark.songId)
+        assertEquals(65_000L, bookmark.positionMs)
+        assertEquals("Guitar Solo", bookmark.label)
+    }
+
+    @Test
     fun songEqualizerEntity_instantiation() {
         val entity = SongEqualizerEntity(
             songId = 42L,

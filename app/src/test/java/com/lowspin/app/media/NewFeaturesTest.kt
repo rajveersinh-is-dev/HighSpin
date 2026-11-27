@@ -184,4 +184,16 @@ class NewFeaturesTest {
         assertEquals(SwipeAction.SEEK_FORWARD_10, SwipeAction.fromId("seek_fwd_10"))
         assertEquals(SwipeAction.NONE, SwipeAction.fromId("invalid_id"))
     }
+
+    @Test
+    fun pitchSemitonesMultiplier_convertsCorrectly() {
+        val mult0 = Math.pow(2.0, 0 / 12.0).toFloat()
+        assertEquals(1.0f, mult0, 0.0001f)
+
+        val mult12 = Math.pow(2.0, 12 / 12.0).toFloat()
+        assertEquals(2.0f, mult12, 0.0001f)
+
+        val multNeg12 = Math.pow(2.0, -12 / 12.0).toFloat()
+        assertEquals(0.5f, multNeg12, 0.0001f)
+    }
 }

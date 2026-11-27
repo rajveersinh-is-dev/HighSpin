@@ -93,6 +93,8 @@ import com.lowspin.app.ui.screens.liked.LikedSongsScreen
 import com.lowspin.app.ui.screens.liked.LikedViewModel
 import com.lowspin.app.ui.screens.moods.MoodBoardScreen
 import com.lowspin.app.ui.screens.nowplaying.NowPlayingScreen
+import com.lowspin.app.ui.screens.smartplaylist.SmartPlaylistScreen
+import com.lowspin.app.data.db.BookmarkEntity
 import com.lowspin.app.ui.screens.permission.PermissionScreen
 import com.lowspin.app.ui.screens.playlist.PlaylistDetailScreen
 import com.lowspin.app.ui.screens.playlist.PlaylistViewModel
@@ -238,6 +240,10 @@ fun LowspinApp(container: AppContainer) {
     var editTagsSong by remember { mutableStateOf<SongEntity?>(null) }
     var optionsSong by remember { mutableStateOf<SongEntity?>(null) }
     var infoSong by remember { mutableStateOf<SongEntity?>(null) }
+
+    val songBookmarks by remember(currentSongId) {
+        container.database.bookmarkDao().observeForSong(currentSongId ?: -1L)
+    }.collectAsStateWithLifecycle(emptyList())
     var songToHide by remember { mutableStateOf<SongEntity?>(null) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
@@ -399,6 +405,7 @@ fun LowspinApp(container: AppContainer) {
                         onMoodsClick = onOpenMoods,
                         onStatsClick = onOpenStats,
                         onDuplicatesClick = onOpenDuplicates,
+                        onSmartPlaylistsClick = { navController.navigate("smartPlaylists") },
                         onAbout = onOpenAbout,
                         onSettings = onOpenSettings,
                         onPlayQueue = onPlayQueue
@@ -492,7 +499,8 @@ fun LowspinApp(container: AppContainer) {
                         viewModel = artistViewModel,
                         currentSongId = currentSongId,
                         onBack = onBack,
-                        onSongOptions = onOpenOptions
+                        onSongOptions = onOpenOptions,
+                        onAlbumClick = { albumId -> navController.navigate("albumDetail/$albumId") }
                     )
                 }
                 composable(
@@ -558,6 +566,14 @@ fun LowspinApp(container: AppContainer) {
                         musicRepository = container.musicRepository,
                         onBack = onBack,
                         onPlaySong = onPlaySong
+                    )
+                }
+                composable("smartPlaylists") {
+                    SmartPlaylistScreen(
+                        database = container.database,
+                        allSongs = songs,
+                        onBack = onBack,
+                        onPlayQueue = onPlayQueue
                     )
                 }
             }
@@ -647,6 +663,22 @@ fun LowspinApp(container: AppContainer) {
                 onCarModeClick = { showCarMode = true },
                 onStartRadio = {
                     currentSong?.let { libraryViewModel.startSmartRadio(it, songs) }
+                },
+                onPitchSemitonesChanged = { semitones ->
+                    container.playbackController.setPitchSemitones(semitones)
+                },
+                bookmarks = songBookmarks,
+                onAddBookmark = { pos ->
+                    currentSong?.let { s ->
+                        scope.launch {
+                            container.database.bookmarkDao().insert(
+                                BookmarkEntity(songId = s.id, positionMs = pos)
+                            )
+                        }
+                    }
+                },
+                onDeleteBookmark = { id ->
+                    scope.launch { container.database.bookmarkDao().delete(id) }
                 },
                 equalizerSettings = container.equalizerSettings,
                 equalizerManager = container.equalizerManager,

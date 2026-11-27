@@ -469,3 +469,36 @@ interface PlayEventDao {
     )
     fun observeTopArtistsSince(sinceMs: Long, limit: Int = 10): Flow<List<ArtistPlayStat>>
 }
+
+@Dao
+interface SmartPlaylistDao {
+    @Query("SELECT * FROM smart_playlists ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<SmartPlaylistEntity>>
+
+    @Query("SELECT * FROM smart_playlists ORDER BY createdAt DESC")
+    suspend fun getAll(): List<SmartPlaylistEntity>
+
+    @Query("SELECT * FROM smart_playlists WHERE id = :id")
+    suspend fun getById(id: Long): SmartPlaylistEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(smartPlaylist: SmartPlaylistEntity): Long
+
+    @Query("DELETE FROM smart_playlists WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface BookmarkDao {
+    @Query("SELECT * FROM bookmarks WHERE songId = :songId ORDER BY positionMs ASC")
+    fun observeForSong(songId: Long): Flow<List<BookmarkEntity>>
+
+    @Query("SELECT * FROM bookmarks WHERE songId = :songId ORDER BY positionMs ASC")
+    suspend fun getForSong(songId: Long): List<BookmarkEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(bookmark: BookmarkEntity): Long
+
+    @Query("DELETE FROM bookmarks WHERE id = :id")
+    suspend fun delete(id: Long)
+}

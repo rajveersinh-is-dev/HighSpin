@@ -16,6 +16,7 @@ import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.palette.graphics.Palette
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -563,7 +564,20 @@ class HighSpinLiveNotificationProvider(
         // NotificationCompat.Builder (which strips MediaStyle and causes Android 15 MediaDataManager
         // and OxygenOS 15 Live Alerts to drop the media capsule).
         val notification = rawNotification
-        notification.color = Notification.COLOR_DEFAULT
+        val themeColor = runCatching {
+            val appearance = (context.applicationContext as? LowspinApplication)?.container?.appearanceSettings
+                ?: AppearanceSettings(context)
+            HighSpinThemes.getOrNull(appearance.themeIndex.value)?.primary?.toArgb()
+        }.getOrNull() ?: 0xFFA78BFA.toInt()
+
+        val bloomColor = runCatching {
+            if (artBitmap != null) {
+                val palette = Palette.from(artBitmap).generate()
+                (palette.darkVibrantSwatch ?: palette.vibrantSwatch ?: palette.dominantSwatch)?.rgb
+            } else null
+        }.getOrNull() ?: themeColor
+
+        notification.color = bloomColor
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
@@ -624,9 +638,10 @@ class HighSpinLiveNotificationProvider(
 
         notification.extras.apply {
             putBoolean(EXTRA_ONGOING, shouldBeOngoing)
-            remove(EXTRA_ANDROID_COLORIZED)
-            remove("colorized")
-            remove("android.color")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                putBoolean(EXTRA_ANDROID_COLORIZED, true)
+                putInt("android.color", bloomColor)
+            }
             putCharSequence("android.title", title)
             putCharSequence("android.text", artist)
             putCharSequence(EXTRA_SUBST_NAME, "HighSpin")

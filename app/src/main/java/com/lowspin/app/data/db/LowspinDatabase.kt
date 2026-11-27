@@ -18,9 +18,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExcludedFolderEntity::class,
         HiddenSongEntity::class,
         SongEqualizerEntity::class,
-        PlayEventEntity::class
+        PlayEventEntity::class,
+        SmartPlaylistEntity::class,
+        BookmarkEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class LowspinDatabase : RoomDatabase() {
@@ -34,6 +36,8 @@ abstract class LowspinDatabase : RoomDatabase() {
     abstract fun hiddenSongDao(): HiddenSongDao
     abstract fun songEqualizerDao(): SongEqualizerDao
     abstract fun playEventDao(): PlayEventDao
+    abstract fun smartPlaylistDao(): SmartPlaylistDao
+    abstract fun bookmarkDao(): BookmarkDao
 
     companion object {
         @Volatile
@@ -170,6 +174,33 @@ abstract class LowspinDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `smart_playlists` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `rules` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `bookmarks` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `songId` INTEGER NOT NULL,
+                        `positionMs` INTEGER NOT NULL,
+                        `label` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_songId` ON `bookmarks` (`songId`)")
+            }
+        }
+
         fun get(context: Context): LowspinDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -184,7 +215,8 @@ abstract class LowspinDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
-                        MIGRATION_7_8
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .build()
                     .also { instance = it }

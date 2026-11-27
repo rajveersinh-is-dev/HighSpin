@@ -171,4 +171,24 @@ data class PlayEventEntity(
     val durationListenedMs: Long
 )
 
+@Entity(tableName = "smart_playlists")
+data class SmartPlaylistEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val name: String,
+    val rules: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "bookmarks",
+    indices = [Index("songId")]
+)
+data class BookmarkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val songId: Long,
+    val positionMs: Long,
+    val label: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 

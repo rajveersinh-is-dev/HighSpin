@@ -20,6 +20,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -121,6 +126,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
+import androidx.compose.material.icons.rounded.BookmarkAdded
+import com.lowspin.app.data.db.BookmarkEntity
+import com.lowspin.app.ui.components.BookmarksSheet
+import com.lowspin.app.ui.components.PitchShiftSheet
 import com.lowspin.app.data.art.GradientPlaceholder
 import com.lowspin.app.data.lyrics.Lyrics
 import com.lowspin.app.media.EqualizerManager
@@ -136,6 +145,7 @@ import com.lowspin.app.ui.components.WaveformSeekBar
 import com.lowspin.app.ui.settings.LocalAppearance
 import com.lowspin.app.ui.settings.SwipeAction
 import com.lowspin.app.ui.theme.LowspinOnAccent
+import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
 import com.lowspin.app.util.formatDuration
 import kotlinx.coroutines.delay
@@ -172,6 +182,10 @@ fun NowPlayingScreen(
     onABRepeatClick: () -> Unit = {},
     onCarModeClick: () -> Unit = {},
     onStartRadio: () -> Unit = {},
+    onPitchSemitonesChanged: (Int) -> Unit = {},
+    bookmarks: List<BookmarkEntity> = emptyList(),
+    onAddBookmark: (Long) -> Unit = {},
+    onDeleteBookmark: (Long) -> Unit = {},
     equalizerSettings: EqualizerSettings? = null,
     equalizerManager: EqualizerManager? = null,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -222,6 +236,9 @@ fun NowPlayingScreen(
     var dragY by remember { mutableFloatStateOf(0f) }
     var showBassDial by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showArtFullscreen by remember { mutableStateOf(false) }
+    var showPitchSheet by remember { mutableStateOf(false) }
+    var showBookmarksSheet by remember { mutableStateOf(false) }
     var doubleTapFlashSide by remember { mutableIntStateOf(0) } // -1 = prev, 1 = next
     var pinchSpeedHud by remember { mutableStateOf<Float?>(null) }
 
@@ -494,6 +511,31 @@ fun NowPlayingScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                text = { Text("Pitch & Key Shift", color = LowspinTextPrimary) },
+                                leadingIcon = { Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showPitchSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Add Bookmark @ ${formatDuration(state.positionMs)}", color = LowspinTextPrimary) },
+                                leadingIcon = { Icon(Icons.Rounded.BookmarkAdded, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onAddBookmark(state.positionMs)
+                                    android.widget.Toast.makeText(context, "Bookmark saved", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("View Bookmarks (${bookmarks.size})", color = LowspinTextPrimary) },
+                                leadingIcon = { Icon(Icons.Rounded.BookmarkAdded, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    showMoreMenu = false
+                                    showBookmarksSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Track Info & Specs", color = LowspinTextPrimary) },
                                 leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
@@ -609,16 +651,24 @@ fun NowPlayingScreen(
                                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                                         shape = RoundedCornerShape(18.dp)
                                     )
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .clickable { showArtFullscreen = true }
                             ) {
-                                AlbumArtImage(
-                                    songId = song.id,
-                                    seed = song.album.ifBlank { song.title },
-                                    modifier = Modifier.fillMaxSize(),
-                                    sizePx = 800,
-                                    shape = RoundedCornerShape(18.dp),
-                                    showRotatingVinyl = true,
-                                    isPlaying = state.isPlaying
-                                )
+                                androidx.compose.animation.Crossfade(
+                                    targetState = song.id,
+                                    animationSpec = tween(if (reduceMotion) 0 else 280),
+                                    label = "albumArtCrossfade"
+                                ) { currentSongId ->
+                                    AlbumArtImage(
+                                        songId = currentSongId,
+                                        seed = song.album.ifBlank { song.title },
+                                        modifier = Modifier.fillMaxSize(),
+                                        sizePx = 800,
+                                        shape = RoundedCornerShape(18.dp),
+                                        showRotatingVinyl = true,
+                                        isPlaying = state.isPlaying
+                                    )
+                                }
                             }
                         }
                     }
@@ -689,52 +739,66 @@ fun NowPlayingScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = LowspinTextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        val codec = remember(song.mimeType, song.folderPath) {
-                            val ext = song.folderPath.substringAfterLast('.', "").uppercase()
-                            when {
-                                ext in listOf("FLAC", "WAV", "OGG", "OPUS", "AAC", "MP3", "M4A", "ALAC", "AIFF") -> ext
-                                song.mimeType.contains("flac", ignoreCase = true) -> "FLAC"
-                                song.mimeType.contains("wav", ignoreCase = true) -> "WAV"
-                                song.mimeType.contains("ogg", ignoreCase = true) -> "OGG"
-                                song.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
-                                song.mimeType.contains("aac", ignoreCase = true) -> "AAC"
-                                song.mimeType.contains("alac", ignoreCase = true) -> "ALAC"
-                                song.mimeType.contains("mp4", ignoreCase = true) || song.mimeType.contains("m4a", ignoreCase = true) -> "M4A"
-                                song.mimeType.contains("mpeg", ignoreCase = true) || song.mimeType.contains("mp3", ignoreCase = true) -> "MP3"
-                                else -> song.mimeType.substringAfterLast('/').uppercase().take(4)
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = song,
+                        transitionSpec = {
+                            if (reduceMotion) {
+                                fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                            } else {
+                                (slideInVertically(tween(220)) { height -> height / 3 } + fadeIn(tween(220)))
+                                    .togetherWith(slideOutVertically(tween(180)) { height -> -height / 3 } + fadeOut(tween(180)))
                             }
+                        },
+                        label = "songTitleMorph",
+                        modifier = Modifier.weight(1f)
+                    ) { currentTrack ->
+                        Column {
+                            Text(
+                                text = currentTrack.title,
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = LowspinTextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = currentTrack.artist,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            val codec = remember(currentTrack.mimeType, currentTrack.folderPath) {
+                                val ext = currentTrack.folderPath.substringAfterLast('.', "").uppercase()
+                                when {
+                                    ext in listOf("FLAC", "WAV", "OGG", "OPUS", "AAC", "MP3", "M4A", "ALAC", "AIFF") -> ext
+                                    currentTrack.mimeType.contains("flac", ignoreCase = true) -> "FLAC"
+                                    currentTrack.mimeType.contains("wav", ignoreCase = true) -> "WAV"
+                                    currentTrack.mimeType.contains("ogg", ignoreCase = true) -> "OGG"
+                                    currentTrack.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
+                                    currentTrack.mimeType.contains("aac", ignoreCase = true) -> "AAC"
+                                    currentTrack.mimeType.contains("alac", ignoreCase = true) -> "ALAC"
+                                    currentTrack.mimeType.contains("mp4", ignoreCase = true) || currentTrack.mimeType.contains("m4a", ignoreCase = true) -> "M4A"
+                                    currentTrack.mimeType.contains("mpeg", ignoreCase = true) || currentTrack.mimeType.contains("mp3", ignoreCase = true) -> "MP3"
+                                    else -> currentTrack.mimeType.substringAfterLast('/').uppercase().take(4)
+                                }
+                            }
+                            val metaSubtitle = buildString {
+                                append(codec)
+                                if (currentTrack.bpm > 0) append(" · ${currentTrack.bpm} BPM")
+                                if (currentTrack.musicalKey.isNotBlank() && currentTrack.musicalKey != "Unknown") append(" · ${currentTrack.musicalKey}")
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = metaSubtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(onClick = onSongInfoClick)
+                                    .padding(vertical = 2.dp)
+                            )
                         }
-                        val metaSubtitle = buildString {
-                            append(codec)
-                            if (song.bpm > 0) append(" · ${song.bpm} BPM")
-                            if (song.musicalKey.isNotBlank() && song.musicalKey != "Unknown") append(" · ${song.musicalKey}")
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = metaSubtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable(onClick = onSongInfoClick)
-                                .padding(vertical = 2.dp)
-                        )
                     }
 
                     LikeParticleButton(
@@ -958,6 +1022,91 @@ fun NowPlayingScreen(
                     )
                 }
             }
+        }
+
+        // Fullscreen Album Art Viewer
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showArtFullscreen,
+            enter = fadeIn(tween(if (reduceMotion) 0 else 240)),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 200))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.96f))
+                    .clickable { showArtFullscreen = false }
+                    .statusBarsPadding()
+                    .navigationBarsPadding(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .shadow(32.dp, RoundedCornerShape(20.dp), spotColor = dominant, ambientColor = dominant)
+                    ) {
+                        AlbumArtImage(
+                            songId = song.id,
+                            seed = song.album.ifBlank { song.title },
+                            modifier = Modifier.fillMaxSize(),
+                            sizePx = 1024,
+                            shape = RoundedCornerShape(20.dp),
+                            showRotatingVinyl = false
+                        )
+                    }
+                    Spacer(Modifier.height(28.dp))
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = LowspinTextPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "Tap anywhere to dismiss",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = LowspinTextMuted
+                    )
+                }
+            }
+        }
+
+        val pitchSemitones by appearance.pitchSemitones.collectAsStateWithLifecycle()
+        if (showPitchSheet) {
+            PitchShiftSheet(
+                currentSemitones = pitchSemitones,
+                onSemitonesChange = { semitones ->
+                    onPitchSemitonesChanged(semitones)
+                },
+                onDismiss = { showPitchSheet = false }
+            )
+        }
+
+        if (showBookmarksSheet) {
+            BookmarksSheet(
+                bookmarks = bookmarks,
+                currentPositionMs = state.positionMs,
+                onAddBookmark = onAddBookmark,
+                onSeekTo = onSeek,
+                onDeleteBookmark = onDeleteBookmark,
+                onDismiss = { showBookmarksSheet = false }
+            )
         }
     }
 }

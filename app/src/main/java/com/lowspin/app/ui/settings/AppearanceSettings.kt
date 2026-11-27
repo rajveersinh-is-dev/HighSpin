@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 
 /** The three calm violet shades kept for backwards compatibility. */
 val LowspinAccentShades = listOf(
@@ -314,6 +315,9 @@ class AppearanceSettings(context: Context) {
     private val _defaultLibraryTab = MutableStateFlow(prefs.getString(KEY_DEFAULT_LIBRARY_TAB, "songs") ?: "songs")
     val defaultLibraryTab: StateFlow<String> = _defaultLibraryTab.asStateFlow()
 
+    private val _pitchSemitones = MutableStateFlow(prefs.getInt(KEY_PITCH_SEMITONES, 0).coerceIn(-6, 6))
+    val pitchSemitones: StateFlow<Int> = _pitchSemitones.asStateFlow()
+
     private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             KEY_THEME -> _themeIndex.value = prefs.getInt(KEY_THEME, 0).coerceIn(0, HighSpinThemes.lastIndex)
@@ -353,6 +357,7 @@ class AppearanceSettings(context: Context) {
             KEY_LIBRARY_TABS_ORDER -> _libraryTabsOrder.value = loadTabsOrder()
             KEY_HIDDEN_LIBRARY_TABS -> _hiddenLibraryTabs.value = loadHiddenTabs()
             KEY_DEFAULT_LIBRARY_TAB -> _defaultLibraryTab.value = prefs.getString(KEY_DEFAULT_LIBRARY_TAB, "songs") ?: "songs"
+            KEY_PITCH_SEMITONES -> _pitchSemitones.value = prefs.getInt(KEY_PITCH_SEMITONES, 0).coerceIn(-6, 6)
         }
     }
 
@@ -485,6 +490,35 @@ class AppearanceSettings(context: Context) {
         _defaultLibraryTab.value = tab
     }
 
+    fun setPitchSemitones(semitones: Int) {
+        val safe = semitones.coerceIn(-6, 6)
+        store { putInt(KEY_PITCH_SEMITONES, safe) }
+        _pitchSemitones.value = safe
+    }
+
+    fun getSongSpeed(songId: Long): Float {
+        val jsonStr = prefs.getString(KEY_SONG_SPEED_MAP, null) ?: return 1.0f
+        return try {
+            val json = JSONObject(jsonStr)
+            val key = songId.toString()
+            if (json.has(key)) json.getDouble(key).toFloat().coerceIn(0.5f, 2.5f) else 1.0f
+        } catch (_: Exception) {
+            1.0f
+        }
+    }
+
+    fun setSongSpeed(songId: Long, speed: Float) {
+        val safeSpeed = speed.coerceIn(0.5f, 2.5f)
+        val jsonStr = prefs.getString(KEY_SONG_SPEED_MAP, null)
+        val json = try {
+            if (jsonStr != null) JSONObject(jsonStr) else JSONObject()
+        } catch (_: Exception) {
+            JSONObject()
+        }
+        json.put(songId.toString(), safeSpeed.toDouble())
+        store { putString(KEY_SONG_SPEED_MAP, json.toString()) }
+    }
+
     private fun store(edit: android.content.SharedPreferences.Editor.() -> Unit) {
         prefs.edit().apply(edit).apply()
     }
@@ -529,5 +563,7 @@ class AppearanceSettings(context: Context) {
         const val KEY_LIBRARY_TABS_ORDER = "library_tabs_order"
         const val KEY_HIDDEN_LIBRARY_TABS = "hidden_library_tabs"
         const val KEY_DEFAULT_LIBRARY_TAB = "default_library_tab"
+        const val KEY_PITCH_SEMITONES = "pitch_semitones"
+        const val KEY_SONG_SPEED_MAP = "song_speed_map"
     }
 }

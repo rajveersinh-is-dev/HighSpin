@@ -121,6 +121,34 @@ class AlbumArtRepository(
         return sizeOf(diskDir) + sizeOf(File(context.cacheDir, "notification_art"))
     }
 
+    private fun decodeFromFolder(songId: Long, sizePx: Int): Bitmap? {
+        val song = runBlocking { songDao.getById(songId) } ?: return null
+        if (song.folderPath.isBlank()) return null
+        val folder = File(song.folderPath)
+        if (!folder.exists() || !folder.isDirectory) return null
+
+        val candidates = listOf("cover.jpg", "cover.png", "folder.jpg", "folder.png", "albumart.jpg", "albumartsmall.jpg", "album.jpg", "album.png")
+        val exactFile = candidates.map { File(folder, it) }.firstOrNull { it.exists() && it.isFile }
+            ?: folder.listFiles()?.firstOrNull { file ->
+                val name = file.name.lowercase()
+                (name.startsWith("cover") || name.startsWith("folder") || name.startsWith("album")) &&
+                (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png"))
+            } ?: return null
+
+        return runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(exactFile.absolutePath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= sizePx && bounds.outHeight / (sample * 2) >= sizePx) {
+                sample *= 2
+            }
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bmp = BitmapFactory.decodeFile(exactFile.absolutePath, options)
+            bmp?.let { scaleCrop(it, sizePx) }
+        }.getOrNull()
+    }
+
     private fun decodeFromMedia(songId: Long, sizePx: Int): Bitmap? {
         val songUri = ContentUris.withAppendedId(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -140,6 +168,8 @@ class AlbumArtRepository(
         } finally {
             runCatching { retriever.release() }
         }
+
+        decodeFromFolder(songId, sizePx)?.let { return it }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching {

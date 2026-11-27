@@ -123,6 +123,7 @@ fun LibraryScreen(
     onMoodsClick: () -> Unit = {},
     onStatsClick: () -> Unit = {},
     onDuplicatesClick: () -> Unit = {},
+    onSmartPlaylistsClick: () -> Unit = {},
     onPlayQueue: ((List<SongEntity>, Int, String) -> Unit)? = null
 ) {
     val scanning = scanState is ScanState.Scanning || scanState is ScanState.Enriching
@@ -161,6 +162,7 @@ fun LibraryScreen(
             onMoodsClick = onMoodsClick,
             onStatsClick = onStatsClick,
             onDuplicatesClick = onDuplicatesClick,
+            onSmartPlaylistsClick = onSmartPlaylistsClick,
             onAbout = onAbout,
             onSettings = onSettings
         )
@@ -249,6 +251,7 @@ private fun LibraryHeader(
     onMoodsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onDuplicatesClick: () -> Unit,
+    onSmartPlaylistsClick: () -> Unit,
     onAbout: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -371,6 +374,20 @@ private fun LibraryHeader(
                     onClick = {
                         onMenuOpenChange(false)
                         onHiddenSongs()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Smart Playlists", color = LowspinTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onSmartPlaylistsClick()
                     }
                 )
                 DropdownMenuItem(
