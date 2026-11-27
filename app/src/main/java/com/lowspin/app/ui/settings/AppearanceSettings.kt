@@ -240,7 +240,7 @@ class AppearanceSettings(context: Context) {
     private val _ambientGlow = MutableStateFlow(prefs.getBoolean(KEY_AMBIENT_GLOW, true))
     val ambientGlow: StateFlow<Boolean> = _ambientGlow.asStateFlow()
 
-    private val _lyricsFontSize = MutableStateFlow(prefs.getFloat(KEY_LYRICS_FONT_SIZE, 16f))
+    private val _lyricsFontSize = MutableStateFlow(prefs.getFloat(KEY_LYRICS_FONT_SIZE, 21f).coerceIn(16f, 34f))
     val lyricsFontSize: StateFlow<Float> = _lyricsFontSize.asStateFlow()
 
     private val _lyricsSyncOffset = MutableStateFlow(prefs.getInt(KEY_LYRICS_SYNC_OFFSET, 0))
@@ -333,7 +333,7 @@ class AppearanceSettings(context: Context) {
             KEY_SHAKE_TO_SKIP -> _shakeToSkip.value = prefs.getBoolean(KEY_SHAKE_TO_SKIP, false)
             KEY_FLIP_TO_PAUSE -> _flipToPause.value = prefs.getBoolean(KEY_FLIP_TO_PAUSE, false)
             KEY_AMBIENT_GLOW -> _ambientGlow.value = prefs.getBoolean(KEY_AMBIENT_GLOW, true)
-            KEY_LYRICS_FONT_SIZE -> _lyricsFontSize.value = prefs.getFloat(KEY_LYRICS_FONT_SIZE, 16f)
+            KEY_LYRICS_FONT_SIZE -> _lyricsFontSize.value = prefs.getFloat(KEY_LYRICS_FONT_SIZE, 21f).coerceIn(16f, 34f)
             KEY_LYRICS_SYNC_OFFSET -> _lyricsSyncOffset.value = prefs.getInt(KEY_LYRICS_SYNC_OFFSET, 0)
             KEY_KEEP_SCREEN_ON -> _keepScreenOn.value = prefs.getBoolean(KEY_KEEP_SCREEN_ON, false)
             KEY_CROSSFADE_SEC -> _crossfadeSec.value = prefs.getInt(KEY_CROSSFADE_SEC, 0)
@@ -417,8 +417,8 @@ class AppearanceSettings(context: Context) {
     fun setAmbientGlow(value: Boolean) = store { putBoolean(KEY_AMBIENT_GLOW, value) }
         .also { _ambientGlow.value = value }
 
-    fun setLyricsFontSize(size: Float) = store { putFloat(KEY_LYRICS_FONT_SIZE, size.coerceIn(12f, 26f)) }
-        .also { _lyricsFontSize.value = size.coerceIn(12f, 26f) }
+    fun setLyricsFontSize(size: Float) = store { putFloat(KEY_LYRICS_FONT_SIZE, size.coerceIn(16f, 34f)) }
+        .also { _lyricsFontSize.value = size.coerceIn(16f, 34f) }
 
     fun setLyricsSyncOffset(offsetMs: Int) = store { putInt(KEY_LYRICS_SYNC_OFFSET, offsetMs.coerceIn(-10000, 10000)) }
         .also { _lyricsSyncOffset.value = offsetMs.coerceIn(-10000, 10000) }
