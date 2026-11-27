@@ -211,4 +211,75 @@ class LrcParserTest {
         assertEquals("Second line", lyrics.lines[1].text)
         assertEquals("Third line", lyrics.lines[2].text)
     }
+
+    @Test
+    fun embeddedLyrics_parsesFlacVorbisAndMp4LyricBoxes() {
+        val dummyContext = object : android.content.ContextWrapper(null) {
+            override fun getPackageName(): String = "com.lowspin.app"
+        }
+        val source = EmbeddedId3LyricsSource(dummyContext)
+
+        // Synthetic FLAC Vorbis comment block with LYRICS=[00:05.00]Hello FLAC
+        val vendor = "libFLAC".toByteArray(Charsets.UTF_8)
+        val entry = "LYRICS=[00:05.00]Hello FLAC".toByteArray(Charsets.UTF_8)
+        val blockLen = 4 + vendor.size + 4 + 4 + entry.size
+        val flacStream = java.io.ByteArrayOutputStream().apply {
+            write("fLaC".toByteArray(Charsets.US_ASCII))
+            // Last block (0x80) | block type 4 (VORBIS_COMMENT)
+            write(0x84)
+            write((blockLen ushr 16) and 0xFF)
+            write((blockLen ushr 8) and 0xFF)
+            write(blockLen and 0xFF)
+            write(intToLe(vendor.size))
+            write(vendor)
+            write(intToLe(1)) // 1 comment
+            write(intToLe(entry.size))
+            write(entry)
+        }.toByteArray()
+
+        val flacLyrics = source.parseStream(flacStream.inputStream())
+        assertNotNull(flacLyrics)
+        assertTrue(flacLyrics!!.synced)
+        assertEquals("FLAC Vorbis Tag", flacLyrics.sourceLabel)
+        assertEquals("Hello FLAC", flacLyrics.lines[0].text)
+        assertEquals(5000L, flacLyrics.lines[0].timeMs)
+
+        // Synthetic MP4/M4A ftyp + ©lyr/data atom
+        val lyricBytes = "Hello M4A\nSecond line".toByteArray(Charsets.UTF_8)
+        val dataAtomLen = 16 + lyricBytes.size
+        val lyrAtomLen = 8 + dataAtomLen
+        val mp4Stream = java.io.ByteArrayOutputStream().apply {
+            write(intToBe(16))
+            write("ftyp".toByteArray(Charsets.US_ASCII))
+            write("M4A ".toByteArray(Charsets.US_ASCII))
+            write(ByteArray(4))
+            write(intToBe(lyrAtomLen))
+            write(byteArrayOf(0xA9.toByte(), 'l'.code.toByte(), 'y'.code.toByte(), 'r'.code.toByte()))
+            write(intToBe(dataAtomLen))
+            write("data".toByteArray(Charsets.US_ASCII))
+            write(ByteArray(8))
+            write(lyricBytes)
+        }.toByteArray()
+
+        val mp4Lyrics = source.parseStream(mp4Stream.inputStream())
+        assertNotNull(mp4Lyrics)
+        assertFalse(mp4Lyrics!!.synced)
+        assertEquals("M4A / MP4 Tag", mp4Lyrics.sourceLabel)
+        assertEquals(2, mp4Lyrics.lines.size)
+        assertEquals("Hello M4A", mp4Lyrics.lines[0].text)
+    }
+
+    private fun intToLe(v: Int): ByteArray = byteArrayOf(
+        (v and 0xFF).toByte(),
+        ((v ushr 8) and 0xFF).toByte(),
+        ((v ushr 16) and 0xFF).toByte(),
+        ((v ushr 24) and 0xFF).toByte()
+    )
+
+    private fun intToBe(v: Int): ByteArray = byteArrayOf(
+        ((v ushr 24) and 0xFF).toByte(),
+        ((v ushr 16) and 0xFF).toByte(),
+        ((v ushr 8) and 0xFF).toByte(),
+        (v and 0xFF).toByte()
+    )
 }

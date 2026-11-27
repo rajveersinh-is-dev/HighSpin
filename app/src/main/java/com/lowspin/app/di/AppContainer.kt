@@ -49,12 +49,13 @@ class AppContainer(context: Context) {
     val playlistRepository = PlaylistRepository(database)
 
     val lyricsRepository = LyricsRepository(
-        CompositeLyricsSource(
+        source = CompositeLyricsSource(
             listOf(
                 LrcLyricsSource(appContext),
                 EmbeddedId3LyricsSource(appContext)
             )
-        )
+        ),
+        appContext = appContext
     )
 
     val equalizerSettings = EqualizerSettings(appContext)

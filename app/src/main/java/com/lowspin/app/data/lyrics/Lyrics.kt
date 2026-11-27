@@ -6,7 +6,8 @@ data class LyricsLine(val timeMs: Long, val text: String)
 
 data class Lyrics(
     val lines: List<LyricsLine>,
-    val synced: Boolean
+    val synced: Boolean,
+    val sourceLabel: String = ""
 )
 
 /**

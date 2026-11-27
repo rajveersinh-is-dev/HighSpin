@@ -4,8 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -95,6 +101,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -138,7 +145,9 @@ fun NowPlayingScreen(
     onMoreClick: () -> Unit,
     showLyrics: Boolean,
     lyrics: Lyrics?,
+    lyricsLoading: Boolean = false,
     onToggleLyrics: () -> Unit,
+    onImportLrc: (Uri) -> Unit = {},
     sleepLabel: String,
     onSleepClick: () -> Unit,
     onSpeedClick: () -> Unit = {},
@@ -201,6 +210,12 @@ fun NowPlayingScreen(
     var showBassDial by remember { mutableStateOf(false) }
     var doubleTapFlashSide by remember { mutableIntStateOf(0) } // -1 = prev, 1 = next
     var pinchSpeedHud by remember { mutableStateOf<Float?>(null) }
+
+    val lrcPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) onImportLrc(uri)
+    }
 
     LaunchedEffect(doubleTapFlashSide) {
         if (doubleTapFlashSide != 0) {
@@ -470,7 +485,7 @@ fun NowPlayingScreen(
                     }
                 }
 
-                if (showLyrics && lyrics != null) {
+                if (showLyrics) {
                     Box(modifier = Modifier.fillMaxSize(0.96f), contentAlignment = Alignment.Center) {
                         if (fluidMeshLyrics) {
                             FluidMeshBackground(
@@ -479,13 +494,94 @@ fun NowPlayingScreen(
                                 modifier = Modifier.clip(RoundedCornerShape(20.dp))
                             )
                         }
-                        LyricsCard(
-                            lyrics = lyrics,
-                            positionMs = state.positionMs,
-                            isPlaying = state.isPlaying,
-                            onSeek = onSeek,
-                            transparentBackground = fluidMeshLyrics
-                        )
+                        when {
+                            lyricsLoading -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(
+                                            if (fluidMeshLyrics) Color.Transparent
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+                                        )
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                        Spacer(Modifier.height(14.dp))
+                                        Text(
+                                            text = "Searching embedded & .lrc lyrics…",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = LowspinTextPrimary
+                                        )
+                                    }
+                                }
+                            }
+                            lyrics != null -> {
+                                LyricsCard(
+                                    lyrics = lyrics,
+                                    positionMs = state.positionMs,
+                                    isPlaying = state.isPlaying,
+                                    onSeek = onSeek,
+                                    onImportClick = { lrcPicker.launch(arrayOf("*/*")) },
+                                    transparentBackground = fluidMeshLyrics
+                                )
+                            }
+                            else -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(
+                                            if (fluidMeshLyrics) Color.Transparent
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+                                        )
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Lyrics,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(44.dp)
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            text = "No lyrics found for this song",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = LowspinTextPrimary,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            text = "Checked embedded MP3, FLAC, M4A & OGG tags and matching .lrc files.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(Modifier.height(18.dp))
+                                        Button(
+                                            onClick = { lrcPicker.launch(arrayOf("*/*")) },
+                                            shape = RoundedCornerShape(20.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = LowspinOnAccent
+                                            )
+                                        ) {
+                                            Text("Import .lrc file")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else if (turntableMode) {
                     TurntableVinyl(
@@ -970,6 +1066,7 @@ private fun LyricsCard(
     positionMs: Long,
     isPlaying: Boolean,
     onSeek: (Long) -> Unit,
+    onImportClick: (() -> Unit)? = null,
     transparentBackground: Boolean = false
 ) {
     val appearance = LocalAppearance.current
@@ -1018,6 +1115,14 @@ private fun LyricsCard(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
+                    if (lyrics.sourceLabel.isNotBlank()) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "· ${lyrics.sourceLabel}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     if (lyrics.synced && syncOffset != 0) {
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -1075,6 +1180,19 @@ private fun LyricsCard(
                             .clickable { appearance.setLyricsFontSize(fontSize + 1.5f) }
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
+
+                    if (onImportClick != null) {
+                        Text(
+                            text = ".LRC",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                                .clickable { onImportClick() }
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
 
                     IconButton(
                         onClick = {

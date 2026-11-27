@@ -1,7 +1,9 @@
 package com.lowspin.app.data.lyrics
 
+import android.content.ContentUris
 import android.content.Context
 import android.os.Environment
+import android.provider.MediaStore
 import com.lowspin.app.data.db.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -66,10 +68,10 @@ object LrcParser {
         return when {
             hasValidTimestamps && timedLines.isNotEmpty() -> {
                 timedLines.sortBy { it.timeMs }
-                Lyrics(lines = timedLines, synced = true)
+                Lyrics(lines = timedLines, synced = true, sourceLabel = ".lrc File")
             }
             plainLines.isNotEmpty() -> {
-                Lyrics(lines = plainLines, synced = false)
+                Lyrics(lines = plainLines, synced = false, sourceLabel = ".lrc File")
             }
             else -> null
         }
@@ -89,6 +91,16 @@ class LrcLyricsSource(
 
     override suspend fun load(song: SongEntity): Lyrics? = withContext(Dispatchers.IO) {
         runCatching {
+            // 1. Check user-imported app-internal .lrc cache first
+            val importedFile = File(File(context.filesDir, "lyrics"), "${song.id}.lrc")
+            if (importedFile.exists() && importedFile.isFile) {
+                val parsed = LrcParser.parse(importedFile.readText(Charsets.UTF_8))
+                if (parsed != null && parsed.lines.isNotEmpty()) {
+                    return@withContext parsed.copy(sourceLabel = "Imported .lrc")
+                }
+            }
+
+            // 2. Check sidecar files directly accessible on storage
             val candidates = findCandidateLrcFiles(song)
             for (file in candidates) {
                 if (file.exists() && file.isFile && file.canRead()) {
@@ -99,7 +111,51 @@ class LrcLyricsSource(
                     }
                 }
             }
+
+            // 3. Fallback: query MediaStore.Files for matching .lrc URIs under Scoped Storage
+            loadFromMediaStore(song)?.let { return@withContext it }
+
             null
+        }.getOrNull()
+    }
+
+    private fun loadFromMediaStore(song: SongEntity): Lyrics? {
+        val fileBaseName = song.matchKey.substringAfterLast('/', "")
+            .substringBeforeLast('.', "")
+            .trim()
+            .takeIf { it.isNotBlank() }
+        val baseTitle = song.title.trim()
+        val names = listOfNotNull(
+            fileBaseName?.let { "$it.lrc" },
+            baseTitle.takeIf { it.isNotEmpty() }?.let { "$it.lrc" },
+            if (song.artist.isNotBlank() && baseTitle.isNotEmpty()) "${song.artist} - $baseTitle.lrc" else null
+        ).distinct()
+        if (names.isEmpty()) return null
+
+        val placeholders = names.joinToString(",") { "?" }
+        val selection = "LOWER(${MediaStore.Files.FileColumns.DISPLAY_NAME}) IN ($placeholders)"
+        val selectionArgs = names.map { it.lowercase() }.toTypedArray()
+
+        return runCatching {
+            context.contentResolver.query(
+                MediaStore.Files.getContentUri("external"),
+                arrayOf(MediaStore.Files.FileColumns._ID),
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
+                    val uri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
+                    val text = context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader(Charsets.UTF_8)
+                        ?.use { it.readText() }
+                    if (!text.isNullOrBlank()) {
+                        return@use LrcParser.parse(text)
+                    }
+                }
+                null
+            }
         }.getOrNull()
     }
 

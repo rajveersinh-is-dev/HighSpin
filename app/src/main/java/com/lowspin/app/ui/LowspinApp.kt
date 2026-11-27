@@ -227,6 +227,7 @@ fun LowspinApp(container: AppContainer) {
     var showSpeedSheet by rememberSaveable { mutableStateOf(false) }
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<Lyrics?>(null) }
+    var lyricsLoading by remember { mutableStateOf(false) }
     var showSleepDialog by remember { mutableStateOf(false) }
     var sleepNow by remember { mutableStateOf(System.currentTimeMillis()) }
     val sleepEndsAt by container.sleepTimer.endsAt.collectAsStateWithLifecycle()
@@ -245,10 +246,13 @@ fun LowspinApp(container: AppContainer) {
     }
 
     LaunchedEffect(showLyrics, currentSongId) {
-        lyrics = if (showLyrics) {
-            currentSong?.let { container.lyricsRepository.load(it) }
+        if (showLyrics && currentSong != null) {
+            lyricsLoading = true
+            lyrics = container.lyricsRepository.load(currentSong)
+            lyricsLoading = false
         } else {
-            null
+            lyricsLoading = false
+            if (!showLyrics) lyrics = null
         }
     }
 
@@ -610,7 +614,24 @@ fun LowspinApp(container: AppContainer) {
                 onMoreClick = { currentSong?.let(onOpenOptions) },
                 showLyrics = showLyrics,
                 lyrics = lyrics,
+                lyricsLoading = lyricsLoading,
                 onToggleLyrics = { showLyrics = !showLyrics },
+                onImportLrc = { uri ->
+                    val song = currentSong
+                    if (song != null) {
+                        scope.launch {
+                            lyricsLoading = true
+                            val imported = container.lyricsRepository.importLrcFromUri(song, uri)
+                            if (imported != null) {
+                                lyrics = imported
+                                android.widget.Toast.makeText(context, "Lyrics imported", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.widget.Toast.makeText(context, "Could not parse selected lyrics file", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            lyricsLoading = false
+                        }
+                    }
+                },
                 sleepLabel = sleepLabel,
                 onSleepClick = { showSleepDialog = true },
                 onSpeedClick = { showSpeedSheet = true },
@@ -735,6 +756,7 @@ fun LowspinApp(container: AppContainer) {
     infoSong?.let { song ->
         SongInfoSheet(
             song = song,
+            lyricsRepository = container.lyricsRepository,
             onDismiss = { infoSong = null }
         )
     }

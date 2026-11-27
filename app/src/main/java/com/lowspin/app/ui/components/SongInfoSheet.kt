@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.BottomSheetDefaults
@@ -50,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lowspin.app.data.db.SongEntity
+import com.lowspin.app.data.lyrics.Lyrics
+import com.lowspin.app.data.lyrics.LyricsRepository
 import com.lowspin.app.ui.theme.LowspinOnAccent
 import com.lowspin.app.ui.theme.LowspinTextMuted
 import com.lowspin.app.ui.theme.LowspinTextPrimary
@@ -73,6 +76,7 @@ data class AudioTechnicalSpecs(
 @Composable
 fun SongInfoSheet(
     song: SongEntity,
+    lyricsRepository: LyricsRepository? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -81,6 +85,14 @@ fun SongInfoSheet(
     val specs by produceState<AudioTechnicalSpecs?>(initialValue = null, song.id) {
         value = withContext(Dispatchers.IO) {
             extractAudioSpecs(context, song)
+        }
+    }
+
+    val lyricsCheck by produceState<Pair<Boolean, Lyrics?>>(initialValue = (lyricsRepository == null) to null, song.id) {
+        value = if (lyricsRepository == null) {
+            true to null
+        } else {
+            true to lyricsRepository.load(song)
         }
     }
 
@@ -246,6 +258,21 @@ fun SongInfoSheet(
                     DetailRow(label = "MIME Type", value = song.mimeType)
                     DetailRow(label = "Folder", value = song.folderName)
                     DetailRow(label = "Track / Disc", value = trackDisplay)
+                    val (lyricsChecked, foundLyrics) = lyricsCheck
+                    val lyricsStatusText = when {
+                        !lyricsChecked -> "Checking…"
+                        foundLyrics != null -> {
+                            val kind = if (foundLyrics.synced) "Synced" else "Plain"
+                            val src = foundLyrics.sourceLabel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+                            "Available ($kind, ${foundLyrics.lines.size} lines$src)"
+                        }
+                        else -> "Not available"
+                    }
+                    DetailRow(
+                        label = "Lyrics",
+                        value = lyricsStatusText,
+                        highlightValue = lyricsChecked && foundLyrics != null
+                    )
                     if (song.bpm > 0) {
                         DetailRow(label = "Tempo", value = "${song.bpm} BPM")
                     }
@@ -334,7 +361,11 @@ private fun SpecItem(label: String, value: String) {
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+    highlightValue: Boolean = false
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -347,8 +378,10 @@ private fun DetailRow(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = LowspinTextPrimary,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = if (highlightValue) FontWeight.SemiBold else FontWeight.Normal
+            ),
+            color = if (highlightValue) MaterialTheme.colorScheme.primary else LowspinTextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 16.dp)
