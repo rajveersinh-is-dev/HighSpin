@@ -269,6 +269,57 @@ class LrcParserTest {
         assertEquals("Hello M4A", mp4Lyrics.lines[0].text)
     }
 
+    @Test
+    fun lyricsRepository_saveLyricsText_syncedAndPlain() = kotlinx.coroutines.runBlocking {
+        val dummySong = com.lowspin.app.data.db.SongEntity(
+            id = 9999L,
+            title = "Test Song",
+            artist = "Test Artist",
+            artistId = 1L,
+            album = "Test Album",
+            albumId = 1L,
+            durationMs = 180000L,
+            trackNumber = 1,
+            discNumber = 1,
+            year = 2024,
+            folderPath = "/music",
+            folderName = "music",
+            contentUri = "content://dummy",
+            mimeType = "audio/mp3",
+            dateAdded = 0L,
+            dateModified = 0L
+        )
+        val dummySource = object : LyricsSource {
+            override suspend fun load(song: com.lowspin.app.data.db.SongEntity): Lyrics? = null
+        }
+        val repo = LyricsRepository(dummySource, null)
+
+        val syncedLrc = """
+            [00:10.50]Hello from web
+            [00:20.00]Second line from web
+        """.trimIndent()
+
+        val parsedSynced = repo.saveLyricsText(dummySong, syncedLrc, "Web (LRCLIB)")
+        assertNotNull(parsedSynced)
+        assertTrue(parsedSynced!!.synced)
+        assertEquals("Web (LRCLIB)", parsedSynced.sourceLabel)
+        assertEquals(2, parsedSynced.lines.size)
+        assertEquals(10500L, parsedSynced.lines[0].timeMs)
+
+        // Test loading from cache
+        val cached = repo.load(dummySong)
+        assertNotNull(cached)
+        assertEquals("Hello from web", cached!!.lines[0].text)
+
+        // Test plain text
+        val plainText = "Line A\nLine B\nLine C"
+        val parsedPlain = repo.saveLyricsText(dummySong, plainText, "Web (URL)")
+        assertNotNull(parsedPlain)
+        assertFalse(parsedPlain!!.synced)
+        assertEquals("Web (URL)", parsedPlain.sourceLabel)
+        assertEquals(3, parsedPlain.lines.size)
+    }
+
     private fun intToLe(v: Int): ByteArray = byteArrayOf(
         (v and 0xFF).toByte(),
         ((v ushr 8) and 0xFF).toByte(),

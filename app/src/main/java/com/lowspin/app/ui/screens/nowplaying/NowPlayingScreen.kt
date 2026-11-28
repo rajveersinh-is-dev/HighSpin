@@ -62,13 +62,17 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AllInclusive
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -82,6 +86,7 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -93,9 +98,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -171,6 +179,8 @@ fun NowPlayingScreen(
     lyricsLoading: Boolean = false,
     onToggleLyrics: () -> Unit,
     onImportLrc: (Uri) -> Unit = {},
+    onFetchOnlineLyrics: () -> Unit = {},
+    onImportLyricsUrl: (String) -> Unit = {},
     sleepLabel: String,
     onSleepClick: () -> Unit,
     onSpeedClick: () -> Unit = {},
@@ -368,7 +378,9 @@ fun NowPlayingScreen(
                 onNext = onNext,
                 onPrevious = onPrevious,
                 onSeek = onSeek,
-                onImportLrc = { lrcPicker.launch(arrayOf("*/*")) }
+                onImportLrc = { lrcPicker.launch(arrayOf("*/*")) },
+                onFetchOnlineLyrics = onFetchOnlineLyrics,
+                onImportLyricsUrl = onImportLyricsUrl
             )
         } else {
             // CLEAN, MINIMAL NORMAL NOW PLAYING SCREEN
@@ -1125,13 +1137,72 @@ private fun FullScreenLyricsView(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
-    onImportLrc: () -> Unit
+    onImportLrc: () -> Unit,
+    onFetchOnlineLyrics: () -> Unit,
+    onImportLyricsUrl: (String) -> Unit
 ) {
     val appearance = LocalAppearance.current
     val context = LocalContext.current
     val fontSize by appearance.lyricsFontSize.collectAsStateWithLifecycle()
     val syncOffset by appearance.lyricsSyncOffset.collectAsStateWithLifecycle()
     var showTools by remember { mutableStateOf(false) }
+    var showUrlDialog by remember { mutableStateOf(false) }
+    var inputUrl by remember { mutableStateOf("") }
+
+    if (showUrlDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showUrlDialog = false
+                inputUrl = ""
+            },
+            title = {
+                Text(
+                    text = "Import Lyrics from Web URL",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Paste a direct web link to a .lrc file, raw text file, or LRCLIB JSON API for \"${song.title}\":",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = inputUrl,
+                        onValueChange = { inputUrl = it },
+                        placeholder = { Text("https://...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmed = inputUrl.trim()
+                        if (trimmed.isNotBlank()) {
+                            onImportLyricsUrl(trimmed)
+                            showUrlDialog = false
+                            inputUrl = ""
+                        }
+                    },
+                    enabled = inputUrl.isNotBlank()
+                ) {
+                    Text("Import")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showUrlDialog = false
+                    inputUrl = ""
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (fluidMeshLyrics) {
@@ -1203,35 +1274,37 @@ private fun FullScreenLyricsView(
             }
 
             // Optional collapsible single-line scrollable caption controls (never wraps vertically)
-            AnimatedVisibility(visible = showTools && lyrics != null) {
-                if (lyrics != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (lyrics.synced) {
-                            CaptionToolChip("-0.5s") { appearance.setLyricsSyncOffset(syncOffset - 500) }
-                            val offsetText = when {
-                                syncOffset > 0 -> "+${syncOffset / 1000.0}s"
-                                syncOffset < 0 -> "${syncOffset / 1000.0}s"
-                                else -> "Sync 0s"
-                            }
-                            Text(
-                                text = offsetText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.75f),
-                                softWrap = false,
-                                maxLines = 1
-                            )
-                            CaptionToolChip("+0.5s") { appearance.setLyricsSyncOffset(syncOffset + 500) }
+            AnimatedVisibility(visible = showTools) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (lyrics != null && lyrics.synced) {
+                        CaptionToolChip("-0.5s") { appearance.setLyricsSyncOffset(syncOffset - 500) }
+                        val offsetText = when {
+                            syncOffset > 0 -> "+${syncOffset / 1000.0}s"
+                            syncOffset < 0 -> "${syncOffset / 1000.0}s"
+                            else -> "Sync 0s"
                         }
-                        CaptionToolChip("A-") { appearance.setLyricsFontSize(fontSize - 2f) }
-                        CaptionToolChip("A+") { appearance.setLyricsFontSize(fontSize + 2f) }
-                        CaptionToolChip("Import .LRC") { onImportLrc() }
+                        Text(
+                            text = offsetText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.75f),
+                            softWrap = false,
+                            maxLines = 1
+                        )
+                        CaptionToolChip("+0.5s") { appearance.setLyricsSyncOffset(syncOffset + 500) }
+                    }
+                    CaptionToolChip("A-") { appearance.setLyricsFontSize(fontSize - 2f) }
+                    CaptionToolChip("A+") { appearance.setLyricsFontSize(fontSize + 2f) }
+                    CaptionToolChip("Web Fetch") { onFetchOnlineLyrics() }
+                    CaptionToolChip("From URL") { showUrlDialog = true }
+                    CaptionToolChip("Import .LRC") { onImportLrc() }
+                    if (lyrics != null) {
                         CaptionToolChip("Copy") {
                             val fullText = lyrics.lines.joinToString("\n") { it.text }
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -1251,7 +1324,7 @@ private fun FullScreenLyricsView(
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(14.dp))
                                 Text(
-                                    text = "Loading captions…",
+                                    text = "Fetching & loading captions…",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = Color.White.copy(alpha = 0.85f)
                                 )
@@ -1260,40 +1333,102 @@ private fun FullScreenLyricsView(
                     }
                     lyrics == null -> {
                         Box(
-                            modifier = Modifier.fillMaxSize().padding(32.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 28.dp, vertical = 24.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Lyrics,
                                     contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(48.dp)
+                                    tint = Color.White.copy(alpha = 0.85f),
+                                    modifier = Modifier.size(52.dp)
                                 )
-                                Spacer(Modifier.height(14.dp))
+                                Spacer(Modifier.height(16.dp))
                                 Text(
                                     text = "No captions found",
                                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                                     color = Color.White,
                                     textAlign = TextAlign.Center
                                 )
-                                Spacer(Modifier.height(6.dp))
+                                Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = "Checked embedded MP3, FLAC, M4A & OGG tags and local .lrc files.",
+                                    text = "Checked embedded audio tags and local files for \"${song.title}\".",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    color = Color.White.copy(alpha = 0.72f),
                                     textAlign = TextAlign.Center
                                 )
-                                Spacer(Modifier.height(20.dp))
+                                Spacer(Modifier.height(24.dp))
+
+                                // One-Click Web Fetch Button
                                 Button(
-                                    onClick = onImportLrc,
+                                    onClick = onFetchOnlineLyrics,
                                     shape = RoundedCornerShape(24.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black
-                                    )
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.85f)
+                                        .height(48.dp)
                                 ) {
-                                    Text("Import .lrc file", fontWeight = FontWeight.Bold)
+                                    Icon(
+                                        imageVector = Icons.Rounded.CloudDownload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "One-Click Web Import",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
+                                // Secondary options: Direct URL & Local File
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { showUrlDialog = true },
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color.White
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.45f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Language,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("From URL", fontSize = 13.sp)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = onImportLrc,
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color.White
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.45f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FolderOpen,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Choose File", fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }

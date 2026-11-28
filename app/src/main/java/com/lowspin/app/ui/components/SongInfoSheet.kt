@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
@@ -38,10 +39,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,11 +96,15 @@ fun SongInfoSheet(
         }
     }
 
-    val lyricsCheck by produceState<Pair<Boolean, Lyrics?>>(initialValue = (lyricsRepository == null) to null, song.id) {
-        value = if (lyricsRepository == null) {
-            true to null
-        } else {
-            true to lyricsRepository.load(song)
+    val scope = rememberCoroutineScope()
+    var isFetchingLyrics by remember { mutableStateOf(false) }
+    var runtimeLyrics by remember(song.id) { mutableStateOf<Lyrics?>(null) }
+    var lyricsLoaded by remember(song.id) { mutableStateOf(lyricsRepository == null) }
+
+    LaunchedEffect(song.id) {
+        if (lyricsRepository != null) {
+            runtimeLyrics = lyricsRepository.load(song)
+            lyricsLoaded = true
         }
     }
 
@@ -258,21 +270,58 @@ fun SongInfoSheet(
                     DetailRow(label = "MIME Type", value = song.mimeType)
                     DetailRow(label = "Folder", value = song.folderName)
                     DetailRow(label = "Track / Disc", value = trackDisplay)
-                    val (lyricsChecked, foundLyrics) = lyricsCheck
+                    val currentLyrics = runtimeLyrics
                     val lyricsStatusText = when {
-                        !lyricsChecked -> "Checking…"
-                        foundLyrics != null -> {
-                            val kind = if (foundLyrics.synced) "Synced" else "Plain"
-                            val src = foundLyrics.sourceLabel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
-                            "Available ($kind, ${foundLyrics.lines.size} lines$src)"
+                        isFetchingLyrics -> "Fetching from web…"
+                        !lyricsLoaded -> "Checking…"
+                        currentLyrics != null -> {
+                            val kind = if (currentLyrics.synced) "Synced" else "Plain"
+                            val src = currentLyrics.sourceLabel.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+                            "Available ($kind, ${currentLyrics.lines.size} lines$src)"
                         }
                         else -> "Not available"
                     }
                     DetailRow(
                         label = "Lyrics",
                         value = lyricsStatusText,
-                        highlightValue = lyricsChecked && foundLyrics != null
+                        highlightValue = lyricsLoaded && currentLyrics != null
                     )
+                    if (lyricsLoaded && currentLyrics == null && lyricsRepository != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        isFetchingLyrics = true
+                                        val fetched = lyricsRepository.fetchOnline(song)
+                                        if (fetched != null) {
+                                            runtimeLyrics = fetched
+                                            Toast.makeText(context, "Lyrics imported from web", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "No online lyrics found for this song", Toast.LENGTH_SHORT).show()
+                                        }
+                                        isFetchingLyrics = false
+                                    }
+                                },
+                                enabled = !isFetchingLyrics
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CloudDownload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (isFetchingLyrics) "Searching…" else "Fetch from Web",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
                     if (song.bpm > 0) {
                         DetailRow(label = "Tempo", value = "${song.bpm} BPM")
                     }

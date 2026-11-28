@@ -648,6 +648,57 @@ fun LowspinApp(container: AppContainer) {
                         }
                     }
                 },
+                onFetchOnlineLyrics = {
+                    val song = currentSong
+                    if (song != null) {
+                        scope.launch {
+                            lyricsLoading = true
+                            val fetched = container.lyricsRepository.fetchOnline(song)
+                            if (fetched != null) {
+                                lyrics = fetched
+                                val count = fetched.lines.size
+                                val type = if (fetched.synced) "Synced" else "Plain"
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Imported $type lyrics ($count lines) from web",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "No online lyrics found for \"${song.title}\"",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            lyricsLoading = false
+                        }
+                    }
+                },
+                onImportLyricsUrl = { url ->
+                    val song = currentSong
+                    if (song != null) {
+                        scope.launch {
+                            lyricsLoading = true
+                            val imported = container.lyricsRepository.importFromUrl(song, url)
+                            if (imported != null) {
+                                lyrics = imported
+                                val count = imported.lines.size
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Lyrics imported from URL ($count lines)",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Could not load or parse lyrics from URL",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            lyricsLoading = false
+                        }
+                    }
+                },
                 sleepLabel = sleepLabel,
                 onSleepClick = { showSleepDialog = true },
                 onSpeedClick = { showSpeedSheet = true },
